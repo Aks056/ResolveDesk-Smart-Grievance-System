@@ -59,10 +59,12 @@ public class Department {
     private LocalDateTime updatedAt;
 
     // Relationships
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @OneToMany(mappedBy = "department", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
     private Set<Grievance> grievances = new HashSet<>();
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @OneToMany(mappedBy = "department", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
     private Set<User> officers = new HashSet<>();

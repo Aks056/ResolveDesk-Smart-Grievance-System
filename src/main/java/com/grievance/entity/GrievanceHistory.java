@@ -30,11 +30,11 @@ public class GrievanceHistory {
     private Grievance grievance;
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 50)
+    @Column(length = 100, columnDefinition = "VARCHAR(100)")
     private GrievanceStatus oldStatus;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 50)
+    @Column(nullable = false, length = 100, columnDefinition = "VARCHAR(100)")
     private GrievanceStatus newStatus;
 
     @Column(columnDefinition = "TEXT")
