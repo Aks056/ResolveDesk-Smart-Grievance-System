@@ -7,7 +7,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,6 +23,7 @@ import com.grievance.dto.response.GrievanceResponse;
 import com.grievance.enums.Priority;
 import com.grievance.security.CustomUserDetails;
 import com.grievance.service.GrievanceService;
+import com.grievance.service.DepartmentService;
 
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
@@ -32,11 +32,18 @@ import lombok.extern.slf4j.Slf4j;
 @RestController
 @RequestMapping("/api/grievances")
 @AllArgsConstructor
-@CrossOrigin(origins = "*", maxAge = 3600)
 @Slf4j
 public class GrievanceController {
 
     private GrievanceService grievanceService;
+    private DepartmentService departmentService;
+
+    // ================= DEPARTMENTS =================
+    @GetMapping("/departments")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> getDepartments() {
+        return ResponseEntity.ok(departmentService.getAllDepartments());
+    }
 
     // ================= SUBMIT =================
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -84,8 +91,11 @@ public class GrievanceController {
     // ================= DETAILS =================
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> getGrievanceDetails(@PathVariable Long id) {
-        return ResponseEntity.ok(grievanceService.getGrievanceDetails(id));
+    public ResponseEntity<?> getGrievanceDetails(@PathVariable Long id, Authentication authentication) {
+        Long requesterId = getUserId(authentication);
+        boolean isAdminOrOfficer = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_OFFICER"));
+        return ResponseEntity.ok(grievanceService.getGrievanceDetails(id, requesterId, isAdminOrOfficer));
     }
 
     // ================= ASSIGNED =================
@@ -116,7 +126,16 @@ public class GrievanceController {
         return ResponseEntity.noContent().build();
     }
 
-    // ================= ALL =================
+    // ================= ALL (Global Feed) =================
+    @GetMapping("/all")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getGlobalGrievances(Authentication authentication) {
+        boolean isAdminOrOfficer = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_OFFICER"));
+        return ResponseEntity.ok(grievanceService.getGlobalGrievances(!isAdminOrOfficer));
+    }
+
+    // ================= ADMIN ALL =================
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
     public ResponseEntity<?> getAllGrievances() {

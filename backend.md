@@ -47,11 +47,20 @@ The backend follows a standard **N-Tier Architecture**:
 
 | Endpoint | Method | Description | Request Body (POST/PUT) |
 | :--- | :--- | :--- | :--- |
-| `/api/auth/register` | `POST` | Register a new user account. | `RegisterRequest` (username, email, password, etc.) |
-| `/api/auth/login` | `POST` | Authenticate and get a JWT token. | `LoginRequest` (username, password) |
+| `/api/auth/register` | `POST` | Register a new user account. | `RegisterRequest` |
+| `/api/auth/login` | `POST` | Authenticate and get a JWT token. | `LoginRequest` |
 | `/api/auth/logout` | `POST` | Standard logout (client-side token deletion). | N/A |
 
-### 3.2 Grievance Management (`/api/grievances`)
+### 3.2 User Profile (`/api/user`)
+*Personal account management.*
+
+| Endpoint | Method | Description | Request Data |
+| :--- | :--- | :--- | :--- |
+| `/api/user/profile` | `GET` | Get current user's profile details. | Auth Token |
+| `/api/user/profile` | `PUT` | Update current user's profile information. | `ProfileUpdateRequest` |
+| `/api/user/change-password` | `PUT` | Change current user's password. | `ChangePasswordRequest` |
+
+### 3.3 Grievance Management (`/api/grievances`)
 *Core functionality for reporting and tracking complaints.*
 
 | Endpoint | Method | Description | Request Data |
@@ -59,13 +68,17 @@ The backend follows a standard **N-Tier Architecture**:
 | `/api/grievances` | `POST` | Submit a new grievance (Multipart). | `title`, `description`, `departmentId`, `priority`, `file` |
 | `/api/grievances/my` | `GET` | List all grievances submitted by the current user. | Auth Token |
 | `/api/grievances/recent` | `GET` | Fetch top 5 recent grievances for the dashboard. | Auth Token |
+| `/api/grievances/all` | `GET` | **Global Feed**: List all grievances (anonymized for users). | Auth Token |
+| `/api/grievances/departments` | `GET` | List available departments for submission. | Auth Token |
 | `/api/grievances/{id}` | `GET` | Get full details of a specific grievance. | ID in Path |
 | `/api/grievances/assigned` | `GET` | (Officer/Admin) List grievances assigned to the officer. | Auth Token |
-| `/api/grievances/{id}/status`| `PUT` | Update status (In Progress, Resolved, Closed). | `UpdateStatusRequest` (status, remarks) |
+| `/api/grievances/{id}/status`| `PUT` | Update status (In Progress, Resolved, Closed). | `UpdateStatusRequest` |
 | `/api/grievances/{id}/accept`| `PUT` | (Officer) Accept a pending grievance assigned to them. | ID in Path |
+| `/api/grievances/{id}/close` | `PUT` | (User) Close a grievance submitted by the current user. | ID in Path |
 | `/api/grievances/{id}/history`| `GET` | View the timeline of events for a grievance. | ID in Path |
+| `/api/grievances/{id}` | `DELETE` | (Admin) Delete a grievance record. | ID in Path |
 
-### 3.3 Dashboard & Statistics (`/api/dashboard`)
+### 3.4 Dashboard & Statistics (`/api/dashboard`)
 *Aggregated data for various roles.*
 
 | Endpoint | Method | Description | Returns |
@@ -75,14 +88,30 @@ The backend follows a standard **N-Tier Architecture**:
 | `/api/dashboard/admin` | `GET` | Global system-wide counts. | `DashboardResponse` |
 | `/api/dashboard/statistics`| `GET` | Detailed breakdown of grievances by status/types. | JSON Map |
 
-### 3.4 Administrative Operations (`/api/admin`)
-*System-wide configuration and department oversight.*
+### 3.5 Feedback Management (`/api/feedback`)
+*Post-resolution feedback and rating.*
+
+| Endpoint | Method | Description | Request Data |
+| :--- | :--- | :--- | :--- |
+| `/api/feedback` | `POST` | Submit feedback for a resolved grievance. | `FeedbackRequest` |
+| `/api/feedback/grievance/{id}`| `GET` | Get all feedback related to a specific grievance. | ID in Path |
+| `/api/feedback/my` | `GET` | List all feedback submitted by the current user. | Auth Token |
+| `/api/feedback/grievance/{id}/rating`| `GET` | Get average rating for a specific grievance. | ID in Path |
+| `/api/feedback/{id}` | `DELETE` | (User) Delete their own feedback. | ID in Path |
+
+### 3.6 Administrative User Operations (`/api/user` and `/api/admin`)
+*System-wide user management and department oversight.*
 
 | Endpoint | Method | Description | Request Body |
 | :--- | :--- | :--- | :--- |
-| `/api/admin/departments` | `GET/POST` | List or Create departments. | `Map<String, String>` (name, description, etc.) |
-| `/api/admin/departments/{id}`| `PUT/DELETE` | Update or Delete a department. | `Map<String, String>` |
-| `/api/admin/grievances/{gid}/assign/{oid}` | `POST` | Manually assign a grievance to an officer. | N/A (IDs in Path) |
+| `/api/user` | `GET` | (Admin) List all users (Paginated). | `page`, `size` |
+| `/api/user/{id}` | `DELETE` | (Admin) Delete a user account. | ID in Path |
+| `/api/user/{id}/activate` | `PUT` | (Admin) Activate an inactive user. | ID in Path |
+| `/api/user/{id}/deactivate`| `PUT` | (Admin) Deactivate a user account. | ID in Path |
+| `/api/user/{id}/role` | `PUT` | (Admin) Change user role (USER, OFFICER, ADMIN). | `{ "role": "..." }` |
+| `/api/user/{id}/department`| `PUT` | (Admin) Assign a department to an officer. | `{ "departmentId": ... }` |
+| `/api/admin/departments` | `GET/POST`| List or Create departments. | `Map<String, String>` |
+| `/api/admin/departments/{id}`| `PUT/DELETE`| Update or Delete a department. | ID in Path |
 
 ---
 
@@ -110,7 +139,9 @@ The backend follows a standard **N-Tier Architecture**:
   "priority": "HIGH",
   "createdAt": "2026-03-30T10:00:00Z",
   "departmentName": "IT Services",
-  "userName": "Ayush Singh"
+  "citizenName": "Ayush Singh",
+  "averageRating": 4.5,
+  "imageUrl": "/uploads/grievance_101.png"
 }
 ```
 
@@ -121,9 +152,18 @@ The backend follows a standard **N-Tier Architecture**:
 1.  **JWT Authentication**:
     The system is stateless. After login, every request must include:
     `Authorization: Bearer <your_jwt_token>`
+
 2.  **Role-Based Access Control (RBAC)**:
     - `ROLE_USER`: Can submit grievances and view their own history.
     - `ROLE_OFFICER`: Can accept/update grievances assigned to their department.
-    - `ROLE_ADMIN`: Can manage departments, users, and reassign grievances.
-3.  **Error Handling**:
-    Global exception handling is implemented in `com.grievance.exception.GlobalExceptionHandler`, returning uniform error messages with HTTP status codes (e.g., 404 for Not Found, 403 for Forbidden).
+    - `ROLE_ADMIN`: Can manage departments, users, and delete records.
+
+3.  **Citizen Name Anonymization (Privacy)**:
+    - To maintain privacy in global feeds, the system automatically masks citizen names for non-administrative roles.
+    - Owners still see their own name, but other users see a masked version (e.g., `A*** S***`).
+
+4.  **Chronological Ordering**:
+    - All grievance lists are returned in **newest-first** order by default (`createdAt DESC`).
+
+5.  **Error Handling**:
+    Global exception handling is implemented in `com.grievance.exception.GlobalExceptionHandler`, returning uniform error messages with HTTP status codes.

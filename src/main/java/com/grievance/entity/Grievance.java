@@ -74,7 +74,7 @@ public class Grievance {
     private String attachmentUrl;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 100, columnDefinition = "VARCHAR(100)")
     @Builder.Default
     private GrievanceStatus status = GrievanceStatus.PENDING;
 

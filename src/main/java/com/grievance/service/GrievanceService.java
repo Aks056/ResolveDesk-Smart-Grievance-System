@@ -92,17 +92,25 @@ public class GrievanceService {
     }
 
     @Transactional(readOnly = true)
-    public GrievanceResponse getGrievanceDetails(Long grievanceId) {
+    public GrievanceResponse getGrievanceDetails(Long grievanceId, Long requesterId, boolean isAdminOrOfficer) {
         Grievance grievance = grievanceRepository.findById(grievanceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
-        return convertToResponse(grievance);
+        
+        GrievanceResponse res = convertToResponse(grievance);
+        
+        // Privacy: Mask name if requester is neither owner nor admin/officer
+        if (!isAdminOrOfficer && !java.util.Objects.equals(grievance.getCitizen().getId(), requesterId)) {
+            res.setCitizenName(maskName(res.getCitizenName()));
+        }
+        
+        return res;
     }
 
     @Transactional(readOnly = true)
     public List<GrievanceResponse> getUserGrievances(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
-        return grievanceRepository.findByCitizen(user).stream()
+        return grievanceRepository.findByCitizenOrderByCreatedAtDesc(user).stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
@@ -111,7 +119,7 @@ public class GrievanceService {
     public List<GrievanceResponse> getRecentGrievances(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
-        return grievanceRepository.findTop3ByCitizenAndStatusOrderByCreatedAtDesc(user, GrievanceStatus.PENDING).stream()
+        return grievanceRepository.findTop5ByCitizenOrderByCreatedAtDesc(user).stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
@@ -120,7 +128,7 @@ public class GrievanceService {
     public List<GrievanceResponse> getAssignedGrievances(Long officerId) {
         User officer = userRepository.findById(officerId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", officerId));
-        return grievanceRepository.findByAssignedOfficer(officer).stream()
+        return grievanceRepository.findByAssignedOfficerOrderByCreatedAtDesc(officer).stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
@@ -196,7 +204,7 @@ public class GrievanceService {
 
     @Transactional(readOnly = true)
     public List<GrievanceResponse> getAllGrievances() {
-        return grievanceRepository.findAll().stream()
+        return grievanceRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
@@ -211,6 +219,34 @@ public class GrievanceService {
         Grievance grievance = grievanceRepository.findById(grievanceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
         grievanceRepository.delete(grievance);
+    }
+
+    @Transactional(readOnly = true)
+    public List<GrievanceResponse> getGlobalGrievances(boolean maskNames) {
+        log.info("Fetching global grievances. Masking enabled: {}", maskNames);
+        return grievanceRepository.findAllByOrderByCreatedAtDesc().stream()
+                .map(g -> {
+                    GrievanceResponse res = convertToResponse(g);
+                    if (maskNames && res.getCitizenName() != null) {
+                        res.setCitizenName(maskName(res.getCitizenName()));
+                    }
+                    return res;
+                })
+                .collect(Collectors.toList());
+    }
+
+    private String maskName(String name) {
+        if (name == null || name.isEmpty()) return "Anonymous";
+        String[] parts = name.split(" ");
+        StringBuilder sb = new StringBuilder();
+        for (String part : parts) {
+            if (part.length() > 1) {
+                sb.append(part.charAt(0)).append("*** ");
+            } else {
+                sb.append(part).append(" ");
+            }
+        }
+        return sb.toString().trim();
     }
 
     private GrievanceResponse convertToResponse(Grievance grievance) {
@@ -242,15 +278,32 @@ public void closeByUser(Long grievanceId, Long userId, String remarks) {
     Grievance grievance = grievanceRepository.findById(grievanceId)
         .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
 
-    if (!grievance.getCitizen().getId().equals(userId)) {
-        throw new RuntimeException("Unauthorized to close this grievance");
+    log.info("[AUTH-TRACE] Author ID: {} | Requestor ID: {} | Types: {} / {}", 
+        grievance.getCitizen().getId(), userId, 
+        grievance.getCitizen().getId().getClass().getSimpleName(), 
+        userId != null ? userId.getClass().getSimpleName() : "null");
+    
+    if (!java.util.Objects.equals(grievance.getCitizen().getId(), userId)) {
+        log.warn("Unauthorized close attempt: Grievance {} owned by {}, attempted by {}", 
+            grievanceId, grievance.getCitizen().getId(), userId);
+        throw new UnauthorizedException("Unauthorized to close this grievance. You are not the original author.");
     }
 
     if (grievance.getStatus() == GrievanceStatus.RESOLVED || grievance.getStatus() == GrievanceStatus.CLOSED_BY_USER) {
-        throw new RuntimeException("Already closed or resolved");
+        throw new BadRequestException("Grievance is already closed or resolved.");
     }
 
+    // Capture status and citizen before save
     GrievanceStatus oldStatus = grievance.getStatus();
+    User citizen = grievance.getCitizen();
+    
+    if (citizen == null) {
+        log.error("Critical integrity error: Grievance {} exists but has no citizen owner!", grievanceId);
+        throw new RuntimeException("Internal data integrity error: Owner not found.");
+    }
+
+    log.info("Transitioning grievance {} status: {} -> {}", grievanceId, oldStatus, GrievanceStatus.CLOSED_BY_USER);
+    
     grievance.setStatus(GrievanceStatus.CLOSED_BY_USER);
     Grievance saved = grievanceRepository.save(grievance);
 
@@ -258,10 +311,17 @@ public void closeByUser(Long grievanceId, Long userId, String remarks) {
             .grievance(saved)
             .oldStatus(oldStatus)
             .newStatus(GrievanceStatus.CLOSED_BY_USER)
-            .remarks(remarks != null ? remarks : "Closed by user")
-            .updatedByUser(grievance.getCitizen())
+            .remarks(remarks != null ? remarks : "Closed by user via portal")
+            .updatedByUser(citizen)
             .build();
-    historyRepository.save(history);
+    
+    try {
+        historyRepository.save(history);
+        log.info("Grievance {} successfully closed and history archived.", grievanceId);
+    } catch (Exception e) {
+        log.error("Failed to save grievance history for {}: {}", grievanceId, e.getMessage());
+        throw new RuntimeException("Database error: Could not archive status transition.");
+    }
 }
 
 // ✅ ACCEPT GRIEVANCE BY OFFICER

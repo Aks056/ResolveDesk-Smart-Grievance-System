@@ -40,7 +40,7 @@ public class DashboardService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
-        List<Grievance> userGrievances = grievanceRepository.findByCitizen(user);
+        List<Grievance> userGrievances = grievanceRepository.findByCitizenOrderByCreatedAtDesc(user);
 
         long pendingCount = userGrievances.stream()
                 .filter(g -> g.getStatus() == GrievanceStatus.PENDING)
@@ -87,7 +87,7 @@ public class DashboardService {
         User officer = userRepository.findById(officerId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", officerId));
 
-        List<Grievance> assignedGrievances = grievanceRepository.findByAssignedOfficer(officer);
+        List<Grievance> assignedGrievances = grievanceRepository.findByAssignedOfficerOrderByCreatedAtDesc(officer);
 
         long assignedCount = assignedGrievances.size();
         long resolvedByMe = assignedGrievances.stream()

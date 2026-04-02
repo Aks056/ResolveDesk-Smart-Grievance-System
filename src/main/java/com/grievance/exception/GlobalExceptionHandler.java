@@ -62,7 +62,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ApiError apiError = new ApiError(
                 HttpStatus.FORBIDDEN,
                 ex.getMessage(),
-                request.getDescription(false).replace("uri=", ""));
+                request.getDescription(false).replace("uri=", 
+                ""));
 
         return new ResponseEntity<>(apiError, HttpStatus.FORBIDDEN);
     }
@@ -124,17 +125,25 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
     }
 
+    // ✅ Specifically handle RuntimeException for logic errors
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ApiError> handleRuntimeException(RuntimeException ex, WebRequest request) {
+        log.error("Logic error: {}", ex.getMessage());
+        ApiError apiError = new ApiError(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                ex.getMessage(),
+                request.getDescription(false).replace("uri=", ""));
+        return new ResponseEntity<>(apiError, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
     // ✅ Catch all
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGenericException(Exception ex, WebRequest request) {
-
         log.error("Unexpected error occurred", ex);
-
         ApiError apiError = new ApiError(
                 HttpStatus.INTERNAL_SERVER_ERROR,
-                "An unexpected error occurred. Please try again later.",
+                "An unexpected database or system exception has occurred. Please contact IT.",
                 request.getDescription(false).replace("uri=", ""));
-
         return new ResponseEntity<>(apiError, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }

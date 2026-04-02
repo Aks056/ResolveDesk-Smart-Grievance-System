@@ -24,10 +24,10 @@ public interface GrievanceRepository extends JpaRepository<Grievance, Long> {
     Optional<Grievance> findByGrievanceNumber(String grievanceNumber);
 
     // Find all grievances by citizen
-    List<Grievance> findByCitizen(User citizen);
+    List<Grievance> findByCitizenOrderByCreatedAtDesc(User citizen);
 
     // Find all grievances assigned to an officer
-    List<Grievance> findByAssignedOfficer(User officer);
+    List<Grievance> findByAssignedOfficerOrderByCreatedAtDesc(User officer);
 
     // Find all grievances by status
     List<Grievance> findByStatus(GrievanceStatus status);
@@ -66,4 +66,10 @@ public interface GrievanceRepository extends JpaRepository<Grievance, Long> {
 
     // Find top 3 recent grievances for a citizen with a specific status
     List<Grievance> findTop3ByCitizenAndStatusOrderByCreatedAtDesc(User citizen, GrievanceStatus status);
+
+    // Find top N recent grievances for a citizen
+    List<Grievance> findTop5ByCitizenOrderByCreatedAtDesc(User citizen);
+
+    // Find all grievances ordered by creation date
+    List<Grievance> findAllByOrderByCreatedAtDesc();
 }
