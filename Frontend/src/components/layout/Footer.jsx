@@ -1,16 +1,39 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { LayoutDashboard, Mail, Phone, MapPin, ExternalLink, Code, Globe, Share2 } from 'lucide-react';
+import { LayoutDashboard, Mail, Phone, MapPin, ExternalLink, Code, Globe, Share2, ChevronDown } from 'lucide-react';
 import { Separator } from "@/components/ui/separator";
+
+const FooterSection = ({ title, defaultOpen, children }) => {
+  return (
+    <details className="group" open={defaultOpen}>
+      <summary className="text-xs font-black uppercase tracking-[0.3em] text-foreground/50 list-none flex justify-between items-center cursor-pointer md:cursor-default py-2 md:py-0 md:pointer-events-none">
+        {title}
+        <ChevronDown className="h-4 w-4 md:hidden transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="pt-4 md:pt-6">
+        {children}
+      </div>
+    </details>
+  );
+};
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const [isDesktop, setIsDesktop] = useState(true);
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   return (
     <footer className="w-full border-t border-border/40 bg-card/10 backdrop-blur-sm selection:bg-primary/30 pt-16 pb-8 px-4">
       <div className="container max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-12 mb-16">
           {/* Brand Section */}
-          <div className="space-y-6">
+          <div className="space-y-6 md:col-span-1">
             <div className="flex items-center gap-3 group">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-secondary shadow-lg transition-transform group-hover:rotate-12">
                  <LayoutDashboard className="h-6 w-6 text-primary-foreground" />
@@ -36,8 +59,7 @@ const Footer = () => {
           </div>
 
           {/* Quick Links */}
-          <div className="space-y-6">
-            <h4 className="text-xs font-black uppercase tracking-[0.3em] text-foreground/50">Navigation</h4>
+          <FooterSection title="Navigation" defaultOpen={isDesktop}>
             <ul className="space-y-4">
               {[
                 { label: 'Dashboard', path: '/dashboard' },
@@ -53,11 +75,10 @@ const Footer = () => {
                 </li>
               ))}
             </ul>
-          </div>
+          </FooterSection>
 
           {/* Campus Resources */}
-          <div className="space-y-6">
-            <h4 className="text-xs font-black uppercase tracking-[0.3em] text-foreground/50">Campus Resources</h4>
+          <FooterSection title="Campus Resources" defaultOpen={isDesktop}>
             <ul className="space-y-4">
               {['Student Portal', 'Academic Calendar', 'Library Access', 'Hostel Services'].map((link) => (
                 <li key={link}>
@@ -68,11 +89,10 @@ const Footer = () => {
                 </li>
               ))}
             </ul>
-          </div>
+          </FooterSection>
 
           {/* Contact Section */}
-          <div className="space-y-6">
-            <h4 className="text-xs font-black uppercase tracking-[0.3em] text-foreground/50">Command Support</h4>
+          <FooterSection title="Command Support" defaultOpen={isDesktop}>
             <ul className="space-y-5">
               <li className="flex items-start gap-4">
                 <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -102,7 +122,7 @@ const Footer = () => {
                 </div>
               </li>
             </ul>
-          </div>
+          </FooterSection>
         </div>
 
         <Separator className="opacity-10" />

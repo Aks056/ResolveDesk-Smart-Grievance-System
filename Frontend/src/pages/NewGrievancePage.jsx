@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Upload, Link as LinkIcon, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Upload, Link as LinkIcon, Loader2, CheckCircle2, AlertCircle, ShieldCheck, Zap, Activity } from "lucide-react";
 import ConfirmDialog from '../components/ConfirmDialog';
 
 const NewGrievancePage = () => {
@@ -28,11 +28,11 @@ const NewGrievancePage = () => {
   });
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [modal, setModal] = useState({ 
-    isOpen: false, 
-    title: "", 
-    description: "", 
-    type: "warning" 
+  const [modal, setModal] = useState({
+    isOpen: false,
+    title: "",
+    description: "",
+    type: "warning"
   });
 
   useEffect(() => {
@@ -86,7 +86,7 @@ const NewGrievancePage = () => {
       setModal({
         isOpen: true,
         title: "Submission Error",
-        description: "Failed to transmit your grievance protocol. Please verify your details and network connection, then try again.",
+        description: "Network distortion interrupted the relay. Verify connection and retry.",
         type: "error"
       });
     } finally {
@@ -96,17 +96,23 @@ const NewGrievancePage = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/10 via-background to-background">
-        <Card className="w-full max-w-md text-center py-12 shadow-[0_0_50px_rgba(182,160,255,0.2)] border-primary/20 backdrop-blur-xl bg-card/50">
+      <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/20 via-background to-background animate-pulse duration-[3000ms]" />
+        <Card className="w-full max-w-lg text-center py-16 shadow-[0_0_80px_rgba(182,160,255,0.3)] border-primary/30 backdrop-blur-3xl bg-card/40 z-10 rounded-3xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/20 rounded-full blur-[50px]" />
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary/20 rounded-full blur-[50px]" />
           <CardContent className="space-y-6">
             <div className="flex justify-center">
-              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center animate-in zoom-in duration-500">
-                <CheckCircle2 className="w-12 h-12 text-primary animate-bounce shadow-[0_0_20px_rgba(182,160,255,0.5)]" />
+              <div className="w-24 h-24 rounded-[30px] bg-primary/10 flex items-center justify-center animate-in zoom-in spin-in-12 duration-700 relative shadow-inner">
+                <div className="absolute inset-0 rounded-[30px] border border-primary/50 animate-ping opacity-30" />
+                <CheckCircle2 className="w-12 h-12 text-primary drop-shadow-[0_0_15px_rgba(182,160,255,1)]" />
               </div>
             </div>
-            <CardTitle className="text-3xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">Transmission Successful</CardTitle>
-            <CardDescription className="text-base text-muted-foreground font-medium">
-              Your grievance has been securely registered. Redirecting to dashboard...
+            <CardTitle className="text-4xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-br from-white via-primary to-secondary pt-4">
+              Relay Complete
+            </CardTitle>
+            <CardDescription className="text-lg text-muted-foreground/90 font-medium">
+              Your transmission has been securely injected into the main grid. Initiating redirect...
             </CardDescription>
           </CardContent>
         </Card>
@@ -115,217 +121,234 @@ const NewGrievancePage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background py-20 px-4 md:px-8 relative selection:bg-primary/30 overflow-hidden transition-colors duration-700">
-      {/* Brand Vignette Layers */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-primary/5 rounded-full blur-[180px] -z-10 mix-blend-screen opacity-40 dark:opacity-60 animate-pulse" />
-      <div className="absolute bottom-[-20%] -left-[-10%] w-[600px] h-[600px] bg-secondary/5 rounded-full blur-[140px] -z-10 opacity-30 dark:opacity-50" />
+    <div className="min-h-screen bg-background text-foreground relative overflow-hidden py-16 px-4 sm:px-6 flex items-center justify-center">
 
-      <div className="w-full max-w-4xl mx-auto space-y-8 relative animate-in fade-in slide-in-from-bottom-8 duration-1000">
-        
-        <Card className="border-border/40 shadow-[0_0_100px_rgba(0,0,0,0.4)] dark:shadow-[0_0_100px_rgba(126,81,255,0.06)] bg-card/60 dark:bg-card/30 backdrop-blur-3xl ring-1 ring-white/10 dark:ring-white/5 overflow-hidden transform transition-all duration-700">
-          <div className="h-2 bg-gradient-to-r from-primary via-secondary to-primary bg-[length:400%_auto] animate-gradient shadow-[0_4px_20px_rgba(126,81,255,0.3)]" />
-          
-          <CardHeader className="space-y-3 pb-8 border-b border-border/10 bg-muted/5">
-            <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.5em] text-primary/80 mb-1 drop-shadow-[0_0_8px_rgba(182,160,255,0.4)]">
-              <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_12px_rgba(182,160,255,1)]" />
-              Secure Portal / Operational Escalation
+      {/* Immersive Background Effects */}
+      <div className="absolute top-0 right-0 w-[50vw] h-[50vw] max-w-[800px] max-h-[800px] bg-primary/10 rounded-full blur-[150px] -translate-y-1/2 translate-x-1/3 opacity-50 dark:opacity-70 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-[50vw] h-[50vw] max-w-[800px] max-h-[800px] bg-secondary/10 rounded-full blur-[150px] translate-y-1/3 -translate-x-1/3 opacity-50 dark:opacity-70 pointer-events-none" />
+
+      {/* Cyber-Grid Overlay */}
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_20%,transparent_100%)] pointer-events-none" />
+
+      <div className="w-full max-w-6xl z-10 grid grid-cols-1 lg:grid-cols-[1fr_1.3fr] gap-12 xl:gap-20 items-stretch">
+
+        {/* Left Column: Branding / Info */}
+        <div className="flex flex-col justify-center space-y-8 animate-in slide-in-from-left-8 fade-in duration-1000 hidden md:flex">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary w-max shadow-[0_0_15px_rgba(182,160,255,0.2)]">
+            <Activity className="w-4 h-4 animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Live Secure Node</span>
+          </div>
+
+          <div className="space-y-4">
+            <h1 className="text-6xl xl:text-7xl font-black tracking-tighter leading-[1.1]">
+              Initiate <br />
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary via-secondary to-primary bg-[length:200%_auto] animate-gradient">
+                Resolution.
+              </span>
+            </h1>
+            <p className="text-xl text-muted-foreground leading-relaxed max-w-md font-medium">
+              Submit your concern directly into our quantum-encrypted redressal network. Assigned officers are notified in real-time.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6 pt-8">
+            <div className="p-5 rounded-3xl bg-secondary/5 border border-secondary/10 flex flex-col gap-3 backdrop-blur-md">
+              <ShieldCheck className="w-8 h-8 text-secondary drop-shadow-[0_0_10px_rgba(0,212,236,0.6)]" />
+              <div className="space-y-1">
+                <h4 className="font-bold text-sm text-foreground">Encrypted Pipeline</h4>
+                <p className="text-xs text-muted-foreground">End-to-end trace protection</p>
+              </div>
             </div>
-            <CardTitle className="text-5xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-foreground via-foreground to-foreground/50">Submit Grievance</CardTitle>
-            <CardDescription className="text-lg text-muted-foreground/80 font-semibold leading-relaxed">
-              Initiate a high-priority redressal request. Your case will be tracked with end-to-end auditability.
-            </CardDescription>
-          </CardHeader>
+            <div className="p-5 rounded-3xl bg-primary/5 border border-primary/10 flex flex-col gap-3 backdrop-blur-md">
+              <Zap className="w-8 h-8 text-primary drop-shadow-[0_0_10px_rgba(182,160,255,0.6)]" />
+              <div className="space-y-1">
+                <h4 className="font-bold text-sm text-foreground">Rapid Triaging</h4>
+                <p className="text-xs text-muted-foreground">Automated priority routing</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
-          <CardContent className="pt-10 px-6 md:px-10 pb-12">
-            <form onSubmit={handleSubmit} className="space-y-8">
-              
-              {/* SECTION: IDENTIFICATION */}
-              <div className="p-6 md:p-8 rounded-3xl border border-border/10 bg-muted/5 space-y-6 transition-all hover:border-primary/30 hover:shadow-[0_0_30px_rgba(126,81,255,0.05)] group">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="title" className="text-[11px] font-black uppercase tracking-[0.25em] text-primary/60 flex items-center gap-2 group-hover:text-primary transition-colors">
-                      <div className="w-1 h-3 bg-primary rounded-full shadow-[0_0_10px_rgba(126,81,255,0.5)]" />
-                      Designation Identifier
-                    </Label>
-                    <span className="text-[10px] font-bold text-primary/40 uppercase tracking-widest">Priority Field</span>
-                  </div>
-                  <Input 
-                    id="title" 
-                    placeholder="Summarize the core concern..." 
+        {/* Right Column: Dynamic Form */}
+        <div className="animate-in slide-in-from-right-8 fade-in duration-1000 delay-150">
+          <Card className="rounded-[2.5rem] border-border/20 shadow-2xl bg-card/60 backdrop-blur-2xl overflow-hidden relative">
+            {/* Top gradient edge */}
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-secondary to-primary opacity-80" />
+
+            <CardContent className="p-8 sm:p-10">
+              {/* Mobile Header (Hidden on Desktop) */}
+              <div className="md:hidden pb-10 space-y-3">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary w-max">
+                  <Activity className="w-3 h-3 animate-pulse" />
+                  <span className="text-[9px] font-black uppercase tracking-widest">Secure Node</span>
+                </div>
+                <h1 className="text-4xl font-black tracking-tighter">Submit Concern</h1>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-8">
+
+                {/* Title */}
+                <div className="space-y-3 group">
+                  <Label htmlFor="title" className="text-xs font-black uppercase tracking-widest text-muted-foreground group-focus-within:text-foreground transition-colors flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary/50 group-focus-within:bg-primary transition-colors shadow-[0_0_8px_rgba(182,160,255,0)] group-focus-within:shadow-[0_0_8px_rgba(182,160,255,0.8)]" />
+                    Subject Matter
+                  </Label>
+                  <Input
+                    id="title"
+                    placeholder="Briefly summarize the issue..."
                     value={formData.title}
-                    onChange={(e) => setFormData({...formData, title: e.target.value})}
-                    className="h-16 border-border/40 bg-background/20 dark:bg-black/40 focus:border-primary/60 focus:ring-primary/5 focus:shadow-[0_0_25px_rgba(126,81,255,0.15)] transition-all font-bold text-xl placeholder:text-muted-foreground/20 rounded-xl"
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    className="h-14 border-x-0 border-t-0 border-b-2 border-b-border/30 rounded-none bg-transparent px-2 text-lg font-bold hover:border-b-primary/50 focus:border-b-primary focus:ring-0 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/30 shadow-none px-0"
                     required
                   />
                 </div>
-              </div>
 
-              {/* SECTION: CLASSIFICATION */}
-              <div className="p-6 md:p-8 rounded-3xl border border-border/10 bg-muted/5 grid grid-cols-1 md:grid-cols-2 gap-10 transition-all hover:border-secondary/30 hover:shadow-[0_0_30px_rgba(0,212,236,0.05)] group">
-                <div className="space-y-4">
-                  <Label htmlFor="department" className="text-[11px] font-black uppercase tracking-[0.25em] text-secondary/60 flex items-center gap-2 group-hover:text-secondary transition-colors">
-                    <div className="w-1 h-3 bg-secondary rounded-full shadow-[0_0_10px_rgba(0,212,236,0.5)]" />
-                    Target Entity
-                  </Label>
-                  <Select 
-                    onValueChange={(val) => setFormData({...formData, departmentId: val})}
-                    required
-                  >
-                    <SelectTrigger className="h-16 border-border/40 bg-background/20 dark:bg-black/40 focus:border-secondary/60 transition-all font-bold rounded-xl">
-                      <SelectValue placeholder={fetchingDeps ? "Synchronizing Data..." : "Select Department"} />
-                    </SelectTrigger>
-                    <SelectContent className="backdrop-blur-3xl border-border bg-card/95">
-                      {departments.map((dept) => (
-                        <SelectItem key={dept.id} value={dept.id.toString()} className="font-bold focus:bg-secondary/10 py-3">
-                          {dept.name}
+                {/* Dropdowns row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                  {/* Department */}
+                  <div className="space-y-3 group">
+                    <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground group-focus-within:text-foreground transition-colors flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-secondary/50 group-focus-within:bg-secondary transition-colors" />
+                      Target Protocol
+                    </Label>
+                    <Select onValueChange={(val) => setFormData({ ...formData, departmentId: val })} required>
+                      <SelectTrigger className="h-14 border-border/30 bg-background/50 hover:bg-background focus:ring-secondary/20 focus:border-secondary transition-all rounded-2xl font-semibold shadow-inner">
+                        <SelectValue placeholder={fetchingDeps ? "Scanning Sectors..." : "Select Department"} />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-border/50 backdrop-blur-2xl bg-card/90">
+                        {departments.map((dept) => (
+                          <SelectItem key={dept.id} value={dept.id.toString()} className="font-semibold py-3 cursor-pointer focus:bg-secondary/15 focus:text-secondary">
+                            {dept.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Priority */}
+                  <div className="space-y-3 group">
+                    <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground group-focus-within:text-foreground transition-colors flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary/50 group-focus-within:bg-primary transition-colors" />
+                      Urgency Level
+                    </Label>
+                    <Select onValueChange={(val) => setFormData({ ...formData, priority: val })} required>
+                      <SelectTrigger className="h-14 border-border/30 bg-background/50 hover:bg-background focus:ring-primary/20 focus:border-primary transition-all rounded-2xl font-semibold shadow-inner">
+                        <SelectValue placeholder="Assess Priority" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-border/50 backdrop-blur-2xl bg-card/90">
+                        <SelectItem value="LOW" className="py-3 font-bold text-xs uppercase tracking-wider cursor-pointer text-green-500/80 focus:bg-green-500/10 focus:text-green-400">
+                          Routine / Low
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                        <SelectItem value="MEDIUM" className="py-3 font-bold text-xs uppercase tracking-wider cursor-pointer text-yellow-500/80 focus:bg-yellow-500/10 focus:text-yellow-400">
+                          Escalated / Medium
+                        </SelectItem>
+                        <SelectItem value="HIGH" className="py-3 font-bold text-xs uppercase tracking-wider cursor-pointer text-destructive/90 focus:bg-destructive/10 focus:text-destructive">
+                          Critical / High
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
-                <div className="space-y-4">
-                  <Label htmlFor="priority" className="text-[11px] font-black uppercase tracking-[0.25em] text-primary/60 flex items-center gap-2 group-hover:text-primary transition-colors">
-                    <div className="w-1 h-3 bg-primary rounded-full shadow-[0_0_10px_rgba(126,81,255,0.5)]" />
-                    Urgency Analysis
+                {/* Description */}
+                <div className="space-y-3 group">
+                  <Label htmlFor="description" className="text-xs font-black uppercase tracking-widest text-muted-foreground group-focus-within:text-foreground transition-colors flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-secondary/50 group-focus-within:bg-secondary transition-colors shadow-[0_0_8px_rgba(0,212,236,0)] group-focus-within:shadow-[0_0_8px_rgba(0,212,236,0.8)]" />
+                    Core Narrative
                   </Label>
-                  <Select 
-                    onValueChange={(val) => setFormData({...formData, priority: val})}
+                  <Textarea
+                    id="description"
+                    placeholder="Provide a comprehensive operational log of the incident..."
+                    className="min-h-[140px] border-border/30 bg-background/50 hover:bg-background focus:ring-secondary/20 focus:border-secondary transition-all rounded-3xl p-5 text-base font-medium resize-none shadow-inner placeholder:text-muted-foreground/30 leading-relaxed"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     required
-                  >
-                    <SelectTrigger className="h-16 border-border/40 bg-background/20 dark:bg-black/40 focus:border-primary/60 transition-all font-bold rounded-xl">
-                      <SelectValue placeholder="Analyze Priority" />
-                    </SelectTrigger>
-                    <SelectContent className="backdrop-blur-3xl border-border bg-card/95">
-                      <SelectItem value="LOW" className="group py-3 font-bold uppercase tracking-widest text-[10px]">
-                        <div className="flex items-center gap-3">
-                          <div className="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.4)]" />
-                          <span className="text-green-500/80 group-hover:text-green-400 transition-colors">Routine / Low</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="MEDIUM" className="group py-3 font-bold uppercase tracking-widest text-[10px]">
-                        <div className="flex items-center gap-3">
-                          <div className="w-3 h-3 rounded-full bg-yellow-500 shadow-[0_0_12px_rgba(234,179,8,0.4)]" />
-                          <span className="text-yellow-500/80 group-hover:text-yellow-400 transition-colors">Escalated / Medium</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="HIGH" className="group py-3 font-bold uppercase tracking-widest text-[10px]">
-                        <div className="flex items-center gap-3">
-                          <div className="w-3 h-3 rounded-full bg-destructive shadow-[0_0_12px_rgba(255,81,250,0.4)]" />
-                          <span className="text-destructive group-hover:text-destructive/80 transition-colors">Critical / High</span>
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                  />
                 </div>
-              </div>
 
-              {/* SECTION: CONTEXT */}
-              <div className="p-6 md:p-8 rounded-3xl border border-border/10 bg-muted/5 space-y-4 transition-all hover:border-secondary/30 hover:shadow-[0_0_30px_rgba(0,212,236,0.05)] group">
-                <Label htmlFor="description" className="text-[11px] font-black uppercase tracking-[0.25em] text-secondary/60 flex items-center gap-2 group-hover:text-secondary transition-colors">
-                  <div className="w-1 h-3 bg-secondary rounded-full shadow-[0_0_10px_rgba(0,212,236,0.5)]" />
-                  Detailed Log & Narrative
-                </Label>
-                <Textarea 
-                  id="description" 
-                  placeholder="Provide a comprehensive breakdown of the incident..." 
-                  className="min-h-[220px] border-border/40 bg-background/20 dark:bg-black/40 focus:border-secondary/60 focus:ring-secondary/5 focus:shadow-[0_0_30px_rgba(0,212,236,0.15)] transition-all font-bold text-lg resize-none placeholder:text-muted-foreground/20 leading-relaxed rounded-xl p-6"
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  required
-                />
-              </div>
+                {/* File Upload & External Link Row */}
+                <div className="space-y-3">
+                  <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
+                    Attach Evidence
+                  </Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-              {/* SECTION: EVIDENCE */}
-              <div className="p-6 md:p-8 rounded-3xl border border-border/10 bg-muted/5 space-y-6 transition-all hover:border-primary/30 hover:shadow-[0_0_30px_rgba(126,81,255,0.05)] group">
-                <Label className="text-[11px] font-black uppercase tracking-[0.25em] text-primary/60 flex items-center gap-2 group-hover:text-primary transition-colors">
-                  <div className="w-1 h-3 bg-primary rounded-full shadow-[0_0_10px_rgba(126,81,255,0.5)]" />
-                  Evidence Uplink Terminal
-                </Label>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div 
-                    className="relative border-2 border-dashed border-border/20 rounded-2xl p-10 flex flex-col items-center justify-center gap-4 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer overflow-hidden group shadow-inner dark:bg-black/20"
-                  >
-                    {preview ? (
-                      <div className="absolute inset-0">
-                        <img src={preview} alt="Preview" className="w-full h-full object-cover opacity-80" />
-                        <div className="absolute inset-0 bg-background/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-                          <Button 
-                            type="button"
-                            variant="destructive" 
-                            size="sm"
-                            className="font-black uppercase tracking-widest px-6 shadow-2xl"
-                            onClick={(e) => { e.stopPropagation(); setPreview(null); setFile(null); }}
-                          >
-                            Purge Asset
-                          </Button>
+                    {/* Visual Upload Area */}
+                    <div className="relative border-2 border-dashed border-border/40 hover:border-primary/50 bg-background/30 hover:bg-primary/5 transition-all rounded-3xl h-24 flex items-center justify-center overflow-hidden cursor-pointer group shadow-inner">
+                      {preview ? (
+                        <div className="absolute inset-0 w-full h-full">
+                          <img src={preview} alt="Upload Preview" className="w-full h-full object-cover opacity-60" />
+                          <div className="absolute inset-0 flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              type="button" size="sm" variant="destructive"
+                              onClick={(e) => { e.stopPropagation(); setPreview(null); setFile(null); }}
+                              className="font-bold tracking-widest uppercase text-[10px] rounded-xl"
+                            >
+                              Discard
+                            </Button>
+                          </div>
                         </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-1">
+                          <Upload className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:-translate-y-1 transition-all" />
+                          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground group-hover:text-foreground">Upload Image</span>
+                        </div>
+                      )}
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        onChange={handleFileChange}
+                      />
+                    </div>
+
+                    {/* External Link Input */}
+                    <div className="relative flex flex-col justify-center bg-background/50 border border-border/30 rounded-3xl px-5 h-24 shadow-inner focus-within:border-secondary/50 focus-within:ring-1 focus-within:ring-secondary/20 transition-all">
+                      <div className="flex items-center gap-2 mb-2">
+                        <LinkIcon className="w-3 h-3 text-secondary" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Ext. Link</span>
                       </div>
+                      <Input
+                        placeholder="https://cloud.host/image.png"
+                        value={formData.imageUrl}
+                        onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                        className="h-8 border-none bg-transparent p-0 shadow-none focus-visible:ring-0 text-xs font-medium placeholder:text-muted-foreground/30"
+                      />
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* Submit Action */}
+                <div className="pt-6">
+                  <Button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full h-16 rounded-[2rem] text-sm font-black uppercase tracking-widest bg-foreground text-background hover:bg-primary hover:text-white shadow-[0_10px_40px_rgba(0,0,0,0.2)] hover:shadow-[0_10px_40px_rgba(182,160,255,0.4)] transition-all duration-300 transform active:scale-95 group overflow-hidden relative"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-primary to-secondary opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    {loading ? (
+                      <span className="relative z-10 flex items-center justify-center gap-3">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Encrypting & Sending...
+                      </span>
                     ) : (
-                      <>
-                        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-[0_0_20px_rgba(126,81,255,0.2)]">
-                          <Upload className="w-8 h-8 text-primary" />
-                        </div>
-                        <div className="text-center">
-                          <p className="text-xs font-black uppercase tracking-widest mb-1 text-foreground/80">Uplink Visuals</p>
-                          <p className="text-[10px] text-muted-foreground/60 font-bold tracking-tight">Direct file injection (JPG/PNG)</p>
-                        </div>
-                        <Input 
-                          type="file" 
-                          className="absolute inset-0 opacity-0 cursor-pointer" 
-                          onChange={handleFileChange}
-                          accept="image/*"
-                        />
-                      </>
+                      <span className="relative z-10 flex items-center justify-center gap-3">
+                        Submit Grievance <Zap className="w-4 h-4" />
+                      </span>
                     )}
-                  </div>
-
-                  <div className="space-y-6 p-10 border border-border/10 rounded-2xl bg-muted/5 backdrop-blur-2xl flex flex-col justify-center dark:bg-black/20">
-                    <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.3em] text-secondary/60">
-                      <LinkIcon className="w-4 h-4 text-secondary/80 shadow-[0_0_8px_rgba(0,212,236,0.4)]" />
-                      External Data Link
-                    </div>
-                    <Input 
-                      placeholder="https://cloud.matrix/evidence..." 
-                      value={formData.imageUrl}
-                      onChange={(e) => setFormData({...formData, imageUrl: e.target.value})}
-                      className="bg-background/20 dark:bg-black/40 border-border/40 h-12 focus:border-secondary/60 focus:shadow-[0_0_20px_rgba(0,212,236,0.2)] transition-all text-sm font-bold rounded-xl"
-                    />
-                  </div>
+                  </Button>
                 </div>
-              </div>
+              </form>
 
-              {/* ACTION: SUBMISSION */}
-              <div className="pt-10">
-                <Button 
-                  type="submit" 
-                  disabled={loading}
-                  className="w-full h-20 text-sm font-black uppercase tracking-[0.4em] bg-gradient-to-r from-primary to-secondary hover:brightness-110 text-white border-none shadow-[0_0_40px_rgba(126,81,255,0.3)] hover:shadow-[0_0_60px_rgba(126,81,255,0.5)] transition-all transform active:scale-[0.97] rounded-2xl group"
-                >
-                  {loading ? (
-                    <div className="flex items-center gap-4">
-                      <Loader2 className="w-6 h-6 animate-spin" /> 
-                      <span className="animate-pulse tracking-widest">Broadcasting Protocol...</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-3 group-hover:scale-105 transition-transform">
-                      Deliver Grievance Protocol
-                      <div className="w-2.5 h-2.5 rounded-full bg-white shadow-[0_0_10px_white] animate-pulse" />
-                    </div>
-                  )}
-                </Button>
-                <div className="mt-8 flex items-center justify-center gap-3 opacity-30 group">
-                  <AlertCircle className="w-4 h-4 text-primary group-hover:animate-shake" />
-                  <p className="text-[10px] font-bold uppercase tracking-[0.3em]">Verified Secure End-to-End Encryption Enabled</p>
-                </div>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
+
       </div>
 
-      <ConfirmDialog 
+      <ConfirmDialog
         isOpen={modal.isOpen}
         title={modal.title}
         description={modal.description}
