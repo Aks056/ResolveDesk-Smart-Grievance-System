@@ -13,11 +13,13 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { 
   LayoutDashboard, Clock, CheckCircle2, AlertCircle, FileText, Plus, Bell, MoreHorizontal,
-  TrendingUp, TrendingDown, Layers, Building2, Ticket, ArrowRight, UserPlus
+  TrendingUp, TrendingDown, Layers, Building2, Ticket, ArrowRight, UserPlus, Search, Ghost
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from 'recharts';
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
 const DashboardPage = () => {
   const { user } = useSelector((state) => state.auth);
@@ -33,6 +35,20 @@ const DashboardPage = () => {
   const [recentGrievances, setRecentGrievances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(Date.now());
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  // Real-time Notification simulation
+  useEffect(() => {
+    if (!loading && recentGrievances.length > 0) {
+      const timer = setTimeout(() => {
+        toast.info(`System Update: Data Synchronized`, {
+          description: `Active records refreshed successfully at ${new Date().toLocaleTimeString()}`,
+          icon: <Bell className="w-4 h-4 text-primary" />
+        });
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, recentGrievances.length]);
   
   const parseDate = (date) => {
     if (Array.isArray(date)) {
@@ -163,18 +179,19 @@ const DashboardPage = () => {
               <Bell className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
             </Button>
             <Button 
-              className="h-12 px-6 gap-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white shadow-lg shadow-indigo-500/20 transition-all font-bold text-sm active:scale-95 group border-none"
+              className="h-12 px-6 gap-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white shadow-lg shadow-indigo-500/20 hover:shadow-[0_0_20px_rgba(79,70,229,0.6)] transition-all font-bold text-sm active:scale-95 group border-none relative overflow-hidden"
               onClick={() => navigate('/grievances/new')}
             >
-              <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" /> 
-              Register New Grievance
+              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out"></div>
+              <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300 relative z-10" /> 
+              <span className="relative z-10">Register New Grievance</span>
             </Button>
           </div>
         </header>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="relative overflow-hidden group border-none shadow-sm ring-1 ring-border hover:ring-primary/30 transition-all duration-300">
+        <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+          <Card className="relative overflow-hidden group border-none shadow-sm ring-1 ring-border hover:ring-primary/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl bg-card/50 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">Total Grievances</CardTitle>
               <div className="p-2 rounded-lg bg-primary/5 text-primary group-hover:bg-primary group-hover:text-white transition-all">
@@ -194,7 +211,7 @@ const DashboardPage = () => {
             </CardContent>
           </Card>
 
-          <Card className="relative overflow-hidden group border-none shadow-sm ring-1 ring-border hover:ring-green-500/30 transition-all duration-300">
+          <Card className="relative overflow-hidden group border-none shadow-sm ring-1 ring-border hover:ring-green-500/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/10 bg-card/50 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">Resolved</CardTitle>
               <div className="p-2 rounded-lg bg-green-500/5 text-green-500 group-hover:bg-green-500 group-hover:text-white transition-all">
@@ -214,7 +231,7 @@ const DashboardPage = () => {
             </CardContent>
           </Card>
 
-          <Card className="relative overflow-hidden group border-none shadow-sm ring-1 ring-border hover:ring-indigo-500/30 transition-all duration-300">
+          <Card className="relative overflow-hidden group border-none shadow-sm ring-1 ring-border hover:ring-indigo-500/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-indigo-500/10 bg-card/50 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">In Progress</CardTitle>
               <div className="p-2 rounded-lg bg-indigo-500/5 text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-all">
@@ -234,7 +251,7 @@ const DashboardPage = () => {
             </CardContent>
           </Card>
 
-          <Card className="relative overflow-hidden group border-none shadow-sm ring-1 ring-border hover:ring-yellow-500/30 transition-all duration-300">
+          <Card className="relative overflow-hidden group border-none shadow-sm ring-1 ring-border hover:ring-yellow-500/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-yellow-500/10 bg-card/50 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">Pending</CardTitle>
               <div className="p-2 rounded-lg bg-yellow-500/5 text-yellow-500 group-hover:bg-yellow-500 group-hover:text-white transition-all">
@@ -267,7 +284,11 @@ const DashboardPage = () => {
               <CardDescription>Visual representation of your ticket status distribution</CardDescription>
             </CardHeader>
             <CardContent className="h-[300px] flex items-center justify-center">
-              {statusData.length > 0 ? (
+              {loading ? (
+                <div className="flex items-center justify-center h-full w-full">
+                   <div className="w-48 h-48 rounded-full border-8 border-muted/30 border-t-primary/50 animate-spin" />
+                </div>
+              ) : statusData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -293,8 +314,9 @@ const DashboardPage = () => {
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="text-center space-y-2 opacity-50">
-                  <p className="text-sm font-medium italic">No data available to chart</p>
+                <div className="text-center space-y-3 opacity-60 flex flex-col items-center justify-center group h-full">
+                  <PieChart className="w-16 h-16 text-muted-foreground/30 group-hover:text-indigo-500/50 transition-colors animate-pulse" />
+                  <p className="text-sm font-medium italic group-hover:text-foreground transition-colors cursor-help" title="No tickets have been matching status criteria so far.">Insufficient Data for Breakdown</p>
                 </div>
               )}
             </CardContent>
@@ -310,7 +332,13 @@ const DashboardPage = () => {
               <CardDescription>Commonly reported departments in your recent activity</CardDescription>
             </CardHeader>
             <CardContent className="h-[300px]">
-              {departmentData.length > 0 ? (
+              {loading ? (
+                <div className="w-full h-full flex items-end gap-2 px-6 pt-10">
+                  {[40, 70, 30, 85, 50, 20].map((h, i) => (
+                    <div key={i} className="bg-muted/50 rounded-t-md animate-pulse flex-1" style={{ height: `${h}%`, animationDelay: `${i * 100}ms` }} />
+                  ))}
+                </div>
+              ) : departmentData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={departmentData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted)/0.3)" />
@@ -343,24 +371,35 @@ const DashboardPage = () => {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-full flex items-center justify-center opacity-50">
-                   <p className="text-sm font-medium italic">Insufficient data for trend analysis</p>
+                <div className="h-full flex flex-col items-center justify-center opacity-60 group">
+                   <BarChart className="w-16 h-16 text-muted-foreground/30 group-hover:text-indigo-500/50 transition-colors mb-3 animate-pulse" />
+                   <p className="text-sm font-medium italic group-hover:text-foreground transition-colors cursor-help" title="Register grievances to populate department trends.">Insufficient data for trend analysis</p>
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Recent Grievances Table */}
         <Card className="border-none shadow-sm ring-1 ring-border bg-card">
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <CardTitle className="text-xl font-bold">Recent Grievances</CardTitle>
               <CardDescription>Track your most recently submitted issues</CardDescription>
             </div>
-            <Button variant="ghost" size="sm" className="text-primary hover:text-primary hover:bg-primary/5 font-bold" onClick={() => navigate('/recent-grievances')}>
-              View All <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="relative w-full sm:w-64 group">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <Input 
+                  placeholder="Filter by title, status..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9 bg-muted/30 border-muted-foreground/20 focus-visible:ring-primary/30"
+                />
+              </div>
+              <Button variant="ghost" size="sm" className="hidden sm:flex text-primary hover:text-primary hover:bg-primary/5 font-bold shrink-0" onClick={() => navigate('/recent-grievances')}>
+                View All <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -384,7 +423,11 @@ const DashboardPage = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {recentGrievances.map((g) => (
+                    {recentGrievances.filter(g => 
+                      g.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      g.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      g.departmentName.toLowerCase().includes(searchTerm.toLowerCase())
+                    ).map((g) => (
                       <TableRow 
                         key={g.id} 
                         className="group hover:bg-primary/[0.02] active:bg-primary/[0.05] transition-colors cursor-pointer"
@@ -411,19 +454,24 @@ const DashboardPage = () => {
                 </Table>
               </div>
             ) : (
-              <div className="py-12 flex flex-col items-center justify-center text-center space-y-4 border-2 border-dashed rounded-xl border-muted/50">
-                <div className="p-4 rounded-full bg-muted/30">
-                  <Ticket className="h-10 w-10 text-muted-foreground/50" />
+              <div className="py-16 flex flex-col items-center justify-center text-center space-y-6 border-2 border-dashed rounded-xl border-muted/50 bg-muted/10">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full animate-pulse"></div>
+                  <div className="p-5 rounded-full bg-background border shadow-sm relative z-10">
+                    <Ghost className="h-10 w-10 text-muted-foreground/60 animate-bounce" style={{ animationDuration: '3s' }} />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <h3 className="font-bold text-lg">No Recent Grievances</h3>
-                  <p className="text-muted-foreground text-sm max-w-[300px]">
-                    You haven't submitted any grievances yet. Click the button below to report your first issue.
+                <div className="space-y-1.5">
+                  <h3 className="font-bold text-xl text-foreground/90">No Grievances Found</h3>
+                  <p className="text-muted-foreground text-sm max-w-[320px] mx-auto leading-relaxed">
+                    {searchTerm ? "No tickets match your search criteria. Try a different filter." : "The tracking system is currently clear. You haven't submitted any reports yet."}
                   </p>
                 </div>
-                <Button variant="outline" className="gap-2 border-primary/20 hover:bg-primary/5 text-primary font-bold" onClick={() => navigate('/grievances/new')}>
-                  <Plus className="h-4 w-4" /> Register New Grievance
-                </Button>
+                {!searchTerm && (
+                  <Button variant="outline" className="gap-2 border-primary/20 hover:bg-primary/5 hover:text-primary transition-all font-bold group" onClick={() => navigate('/grievances/new')}>
+                    <Plus className="h-4 w-4 group-hover:rotate-90 transition-transform duration-300" /> Register New Grievance
+                  </Button>
+                )}
               </div>
             )}
           </CardContent>

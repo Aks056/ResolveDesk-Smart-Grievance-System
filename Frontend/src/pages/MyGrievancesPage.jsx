@@ -1,18 +1,21 @@
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  AlertCircle,
+  Building2,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  FileText,
+  Search
+} from "lucide-react";
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
-import { 
-  Card, CardContent, CardDescription, CardHeader, CardTitle 
-} from "@/components/ui/card";
-import { 
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { 
-  Search, Filter, ChevronRight, Building2, Clock, CheckCircle2, AlertCircle, FileText
-} from "lucide-react";
 
 const MyGrievancesPage = () => {
   const navigate = useNavigate();
@@ -54,8 +57,10 @@ const MyGrievancesPage = () => {
     switch (status) {
       case 'RESOLVED': return <Badge className="rounded-full bg-green-500/10 text-green-600 border-green-500/20 px-3">Resolved</Badge>;
       case 'PENDING': return <Badge className="rounded-full bg-yellow-500/10 text-yellow-600 border-yellow-500/20 px-3">Pending</Badge>;
+      case 'ASSIGNED': return <Badge className="rounded-full bg-blue-500/10 text-blue-600 border-blue-500/20 px-3">Assigned</Badge>;
       case 'IN_PROGRESS': return <Badge className="rounded-full bg-indigo-500/10 text-indigo-600 border-indigo-500/20 px-3">In Progress</Badge>;
-      case 'CLOSED': return <Badge className="rounded-full bg-slate-500/10 text-slate-600 border-slate-500/20 px-3">Closed</Badge>;
+      case 'REJECTED': return <Badge className="rounded-full bg-red-500/10 text-red-600 border-red-500/20 px-3">Rejected</Badge>;
+      case 'CLOSED_BY_USER': return <Badge className="rounded-full bg-slate-500/10 text-slate-600 border-slate-500/20 px-3">Closed</Badge>;
       default: return <Badge variant="outline" className="rounded-full px-3">{status}</Badge>;
     }
   };
@@ -93,7 +98,7 @@ const MyGrievancesPage = () => {
             />
           </div>
           <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 no-scrollbar">
-            {['ALL', 'PENDING', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].map((status) => (
+            {['ALL', 'PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'REJECTED', 'CLOSED_BY_USER'].map((status) => (
               <Button
                 key={status}
                 variant={filterStatus === status ? 'default' : 'outline'}
@@ -103,7 +108,7 @@ const MyGrievancesPage = () => {
                   filterStatus === status ? 'bg-primary shadow-lg shadow-primary/20' : 'hover:bg-primary/5'
                 }`}
               >
-                {status}
+                {status === 'CLOSED_BY_USER' ? 'CLOSED' : status}
               </Button>
             ))}
           </div>
@@ -128,11 +133,14 @@ const MyGrievancesPage = () => {
                   <div className={`hidden md:flex h-14 w-14 items-center justify-center rounded-2xl shrink-0 transition-colors ${
                     g.status === 'RESOLVED' ? 'bg-green-500/10 text-green-500' :
                     g.status === 'PENDING' ? 'bg-yellow-500/10 text-yellow-500' :
+                    g.status === 'ASSIGNED' ? 'bg-blue-500/10 text-blue-500' :
                     g.status === 'IN_PROGRESS' ? 'bg-indigo-500/10 text-indigo-500' :
+                    g.status === 'REJECTED' ? 'bg-red-500/10 text-red-500' :
                     'bg-slate-500/10 text-slate-500'
                   }`}>
                     {g.status === 'RESOLVED' ? <CheckCircle2 className="h-6 w-6" /> :
                      g.status === 'PENDING' ? <AlertCircle className="h-6 w-6" /> :
+                     g.status === 'ASSIGNED' ? <Clock className="h-6 w-6" /> :
                      g.status === 'IN_PROGRESS' ? <Clock className="h-6 w-6" /> : 
                      <FileText className="h-6 w-6" />}
                   </div>
