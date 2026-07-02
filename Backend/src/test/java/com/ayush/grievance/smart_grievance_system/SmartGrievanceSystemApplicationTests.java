@@ -2,8 +2,9 @@ package com.ayush.grievance.smart_grievance_system;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import com.grievance.SmartGrievanceApplication;
 
-@SpringBootTest
+@SpringBootTest(classes = SmartGrievanceApplication.class)
 class SmartGrievanceSystemApplicationTests {
 
 	@Test
