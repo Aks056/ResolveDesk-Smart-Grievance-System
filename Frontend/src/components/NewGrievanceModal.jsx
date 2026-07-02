@@ -3,7 +3,7 @@ import api from '../lib/api';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import CoreNarrative from './CoreNarrative';
 import { 
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select";
@@ -25,6 +25,7 @@ const NewGrievanceModal = ({ isOpen, onClose, onSuccess }) => {
   });
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [evidenceType, setEvidenceType] = useState('upload'); // 'upload' or 'link'
 
   useEffect(() => {
     if (isOpen) {
@@ -56,15 +57,24 @@ const NewGrievanceModal = ({ isOpen, onClose, onSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.description || !formData.description.trim()) {
+      alert("The Core Narrative operational log cannot be empty.");
+      return;
+    }
     setLoading(true);
 
     try {
       const data = new FormData();
       data.append('title', formData.title);
-      data.append('description', formData.description + (formData.imageUrl ? `\n\nReference Image URL: ${formData.imageUrl}` : ''));
+      
+      let finalDescription = formData.description;
+      if (evidenceType === 'link' && formData.imageUrl) {
+        finalDescription += `\n\nReference Image URL: ${formData.imageUrl}`;
+      }
+      data.append('description', finalDescription);
       data.append('departmentId', formData.departmentId);
       data.append('priority', formData.priority);
-      if (file) {
+      if (evidenceType === 'upload' && file) {
         data.append('file', file);
       }
 
@@ -134,7 +144,7 @@ const NewGrievanceModal = ({ isOpen, onClose, onSuccess }) => {
                   placeholder="Summarize your issue..." 
                   value={formData.title}
                   onChange={(e) => setFormData({...formData, title: e.target.value})}
-                  className="h-12 border-muted-foreground/10 bg-background/30 focus:border-cyan-400/50 focus:ring-cyan-400/10 transition-all placeholder:text-muted-foreground/30 font-medium"
+                  className="h-12 border-muted-foreground/10 bg-background/30 focus:border-cyan-400/50 focus:ring-cyan-400/10 transition-all placeholder:text-muted-foreground/65 font-medium"
                   required
                 />
               </div>
@@ -193,67 +203,96 @@ const NewGrievanceModal = ({ isOpen, onClose, onSuccess }) => {
                 </div>
               </div>
 
-              {/* Description */}
+              {/* Description (CoreNarrative Terminal) */}
               <div className="space-y-2.5">
-                <Label htmlFor="description" className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">Description & Details</Label>
-                <Textarea 
-                  id="description" 
-                  placeholder="Describe your grievance in detail..." 
-                  className="min-h-[120px] border-muted-foreground/10 bg-background/30 focus:border-cyan-400/50 transition-all placeholder:text-muted-foreground/30 font-medium resize-none"
+                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">Core Narrative</Label>
+                <CoreNarrative 
                   value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  required
+                  onChange={(text) => setFormData({...formData, description: text})}
+                  placeholder="Provide a comprehensive operational log. Include specific locations, dates, and the immediate impact to expedite routing..."
                 />
               </div>
 
-              {/* Evidence Group */}
+              {/* Evidence Group Tabs */}
               <div className="space-y-4">
-                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">Supporting Evidence</Label>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">Supporting Evidence</Label>
+                  
+                  {/* Glassmorphic Tab Switcher */}
+                  <div className="flex p-1 bg-muted/40 backdrop-blur-md rounded-2xl border border-border/30 w-max">
+                    <button
+                      type="button"
+                      onClick={() => setEvidenceType('upload')}
+                      className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all ${
+                        evidenceType === 'upload'
+                          ? 'bg-background text-foreground shadow-sm border border-border/20'
+                          : 'text-muted-foreground/60 hover:text-foreground'
+                      }`}
+                    >
+                      Local Upload
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEvidenceType('link')}
+                      className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all ${
+                        evidenceType === 'link'
+                          ? 'bg-background text-foreground shadow-sm border border-border/20'
+                          : 'text-muted-foreground/60 hover:text-foreground'
+                      }`}
+                    >
+                      Cloud Link
+                    </button>
+                  </div>
+                </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div 
-                    className="relative border-2 border-dashed border-muted-foreground/10 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:border-cyan-400/40 hover:bg-cyan-400/5 transition-all cursor-pointer overflow-hidden group"
-                  >
-                    {preview ? (
-                      <div className="absolute inset-0">
-                        <img src={preview} alt="Preview" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[1px]">
-                          <Button 
-                            type="button"
-                            variant="ghost" 
-                            className="text-white hover:bg-white/10" 
-                            onClick={(e) => { e.stopPropagation(); setPreview(null); setFile(null); }}
-                          >
-                            Reset
-                          </Button>
+                <div className="relative">
+                  {evidenceType === 'upload' ? (
+                    /* Visual Upload Area */
+                    <div 
+                      className="relative border-2 border-dashed border-muted-foreground/10 rounded-xl p-6 flex flex-col items-center justify-center gap-2 hover:border-cyan-400/40 hover:bg-cyan-400/5 transition-all cursor-pointer overflow-hidden group min-h-[110px]"
+                    >
+                      {preview ? (
+                        <div className="absolute inset-0">
+                          <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[1px]">
+                            <Button 
+                              type="button"
+                              variant="ghost" 
+                              className="text-white hover:bg-white/10" 
+                              onClick={(e) => { e.stopPropagation(); setPreview(null); setFile(null); }}
+                            >
+                              Reset
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <>
-                        <Upload className="w-5 h-5 text-cyan-400 opacity-50 group-hover:opacity-100 transition-opacity" />
-                        <p className="text-[10px] font-bold uppercase tracking-tighter text-muted-foreground/80">Upload Photo</p>
-                        <Input 
-                          type="file" 
-                          className="absolute inset-0 opacity-0 cursor-pointer" 
-                          onChange={handleFileChange}
-                          accept="image/*"
-                        />
-                      </>
-                    )}
-                  </div>
-
-                  <div className="space-y-2 p-4 border border-muted-foreground/5 rounded-xl bg-muted/10 backdrop-blur-sm flex flex-col justify-center">
-                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-muted-foreground/60">
-                      <LinkIcon className="w-3 h-3 text-cyan-400" />
-                      External Link
+                      ) : (
+                        <>
+                          <Upload className="w-5 h-5 text-cyan-400 opacity-50 group-hover:opacity-100 transition-opacity" />
+                          <p className="text-[10px] font-bold uppercase tracking-tighter text-muted-foreground/80">Upload Photo</p>
+                          <Input 
+                            type="file" 
+                            className="absolute inset-0 opacity-0 cursor-pointer" 
+                            onChange={handleFileChange}
+                            accept="image/*"
+                          />
+                        </>
+                      )}
                     </div>
-                    <Input 
-                      placeholder="https://..." 
-                      value={formData.imageUrl}
-                      onChange={(e) => setFormData({...formData, imageUrl: e.target.value})}
-                      className="bg-transparent border-muted-foreground/10 h-8 focus:border-cyan-400/30 transition-all text-xs"
-                    />
-                  </div>
+                  ) : (
+                    /* External Link Input */
+                    <div className="space-y-2 p-5 border border-muted-foreground/5 rounded-xl bg-muted/10 backdrop-blur-sm flex flex-col justify-center min-h-[110px]">
+                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter text-muted-foreground/60">
+                        <LinkIcon className="w-3 h-3 text-cyan-400" />
+                        External Link
+                      </div>
+                      <Input 
+                        placeholder="https://..." 
+                        value={formData.imageUrl}
+                        onChange={(e) => setFormData({...formData, imageUrl: e.target.value})}
+                        className="bg-transparent border-muted-foreground/10 h-8 focus:border-cyan-400/30 transition-all text-xs"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 

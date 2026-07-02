@@ -53,25 +53,76 @@ const MyGrievancesPage = () => {
     return matchesSearch && matchesFilter;
   }).sort((a, b) => parseDate(b.createdAt) - parseDate(a.createdAt));
 
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'RESOLVED': return <Badge className="rounded-full bg-green-500/10 text-green-600 border-green-500/20 px-3">Resolved</Badge>;
-      case 'PENDING': return <Badge className="rounded-full bg-yellow-500/10 text-yellow-600 border-yellow-500/20 px-3">Pending</Badge>;
-      case 'ASSIGNED': return <Badge className="rounded-full bg-blue-500/10 text-blue-600 border-blue-500/20 px-3">Assigned</Badge>;
-      case 'IN_PROGRESS': return <Badge className="rounded-full bg-indigo-500/10 text-indigo-600 border-indigo-500/20 px-3">In Progress</Badge>;
-      case 'REJECTED': return <Badge className="rounded-full bg-red-500/10 text-red-600 border-red-500/20 px-3">Rejected</Badge>;
-      case 'CLOSED_BY_USER': return <Badge className="rounded-full bg-slate-500/10 text-slate-600 border-slate-500/20 px-3">Closed</Badge>;
-      default: return <Badge variant="outline" className="rounded-full px-3">{status}</Badge>;
+  // Configuration lookup mappings for status and priority styling
+  const statusConfig = {
+    RESOLVED: {
+      label: 'Resolved',
+      classes: 'bg-emerald-100/80 text-emerald-800 border-emerald-200/30 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/30'
+    },
+    PENDING: {
+      label: 'Pending',
+      classes: 'bg-amber-100/80 text-amber-800 border-amber-200/30 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/30'
+    },
+    ASSIGNED: {
+      label: 'Assigned',
+      classes: 'bg-blue-100/80 text-blue-800 border-blue-200/30 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/30'
+    },
+    IN_PROGRESS: {
+      label: 'In Progress',
+      classes: 'bg-indigo-100/80 text-indigo-800 border-indigo-200/30 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-900/30'
+    },
+    REJECTED: {
+      label: 'Rejected',
+      classes: 'bg-rose-100/80 text-rose-800 border-rose-200/30 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/30'
+    },
+    CLOSED_BY_USER: {
+      label: 'Closed',
+      classes: 'bg-slate-100/80 text-slate-700 border-slate-200/30 dark:bg-slate-800/40 dark:text-slate-300 dark:border-slate-700/30'
     }
   };
 
-  const getPriorityBadge = (priority) => {
-    switch (priority) {
-      case 'HIGH': return <Badge variant="outline" className="rounded-full border-red-500/20 text-red-600 bg-red-500/5 px-3">High</Badge>;
-      case 'MEDIUM': return <Badge variant="outline" className="rounded-full border-orange-500/20 text-orange-600 bg-orange-500/5 px-3">Medium</Badge>;
-      case 'LOW': return <Badge variant="outline" className="rounded-full border-green-500/20 text-green-600 bg-green-500/5 px-3">Low</Badge>;
-      default: return <Badge variant="outline" className="rounded-full px-3">{priority}</Badge>;
+  const priorityConfig = {
+    HIGH: {
+      label: 'High',
+      dotClass: 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]',
+      classes: 'bg-rose-50/50 text-rose-700 border-rose-200/30 dark:bg-rose-950/10 dark:text-rose-300 dark:border-rose-900/20'
+    },
+    MEDIUM: {
+      label: 'Medium',
+      dotClass: 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]',
+      classes: 'bg-amber-50/50 text-amber-700 border-amber-200/30 dark:bg-amber-950/10 dark:text-amber-300 dark:border-amber-900/20'
+    },
+    LOW: {
+      label: 'Low',
+      dotClass: 'bg-slate-400',
+      classes: 'bg-slate-50/50 text-slate-600 border-slate-200/30 dark:bg-slate-800/20 dark:text-slate-300 dark:border-slate-700/20'
     }
+  };
+
+  const getStatusBadge = (status) => {
+    const config = statusConfig[status] || {
+      label: status,
+      classes: 'bg-slate-100 text-slate-800 border-slate-200'
+    };
+    return (
+      <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-semibold border ${config.classes} transition-all duration-300`}>
+        {config.label}
+      </span>
+    );
+  };
+
+  const getPriorityBadge = (priority) => {
+    const config = priorityConfig[priority] || {
+      label: priority,
+      dotClass: 'bg-slate-400',
+      classes: 'bg-slate-50 text-slate-600 border-slate-200'
+    };
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold border ${config.classes} transition-all duration-300`}>
+        <span className={`h-2 w-2 rounded-full ${config.dotClass}`} />
+        {config.label}
+      </span>
+    );
   };
 
   return (
