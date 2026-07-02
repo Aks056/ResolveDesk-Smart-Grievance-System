@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../../store/authSlice';
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -108,7 +109,21 @@ const Navbar = () => {
             {isDark ? <Sun className="h-5 w-5 text-cyan-400" /> : <Moon className="h-5 w-5 text-indigo-600" />}
           </Button>
 
-          <Button variant="ghost" size="icon" className="relative text-muted-foreground hidden sm:flex">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            title="System Notifications"
+            className="relative rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors flex"
+            onClick={() => {
+              if (window.location.pathname === '/dashboard') {
+                window.location.reload();
+              } else {
+                toast.info("System Sync", {
+                  description: "Dashboard state and credentials are up to date."
+                });
+              }
+            }}
+          >
             <Bell className="h-5 w-5" />
             <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-destructive shadow-[0_0_8px_rgba(255,81,250,0.8)]" />
           </Button>

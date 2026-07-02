@@ -1,5 +1,5 @@
 import React from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -12,34 +12,62 @@ import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './components/layout/MainLayout';
 import ScrollToTop from './components/ScrollToTop';
 
-const App = () => {
-  const { isAuthenticated } = useSelector((state) => state.auth);
-
+// Helper component for ScrollToTop in RouterProvider
+const ScrollWrapper = () => {
   return (
     <>
       <ScrollToTop />
-      <Routes>
-        <Route path="/login" element={!isAuthenticated ? <LoginPage /> : <Navigate to="/dashboard" />} />
-        
-        {/* Protected Routes with MainLayout */}
-        <Route element={
-          <ProtectedRoute>
-            <MainLayout />
-          </ProtectedRoute>
-        }>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/grievances" element={<MyGrievancesPage />} />
-          <Route path="/recent-grievances" element={<RecentGrievancesPage />} />
-          <Route path="/grievances/new" element={<NewGrievancePage />} />
-          <Route path="/grievances/:id" element={<GrievanceDetailsPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-        </Route>
-
-        <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
+      <Outlet />
     </>
   );
+};
+
+const PublicRoute = () => {
+  const { isAuthenticated } = useSelector((state) => state.auth);
+  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Outlet />;
+};
+
+const App = () => {
+  const { isAuthenticated } = useSelector((state) => state.auth);
+
+  const router = createBrowserRouter([
+    {
+      element: <ScrollWrapper />,
+      children: [
+        {
+          element: <PublicRoute />,
+          children: [
+            { path: "/login", element: <LoginPage /> }
+          ]
+        },
+        {
+          element: (
+            <ProtectedRoute>
+              <MainLayout />
+            </ProtectedRoute>
+          ),
+          children: [
+            { path: "/dashboard", element: <DashboardPage /> },
+            { path: "/grievances", element: <MyGrievancesPage /> },
+            { path: "/recent-grievances", element: <RecentGrievancesPage /> },
+            { path: "/grievances/new", element: <NewGrievancePage /> },
+            { path: "/grievances/:id", element: <GrievanceDetailsPage /> },
+            { path: "/profile", element: <ProfilePage /> }
+          ]
+        },
+        {
+          path: "/",
+          element: <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />
+        },
+        {
+          path: "*",
+          element: <Navigate to="/" replace />
+        }
+      ]
+    }
+  ]);
+
+  return <RouterProvider router={router} />;
 };
 
 export default App;
