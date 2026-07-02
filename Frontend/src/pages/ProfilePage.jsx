@@ -25,8 +25,10 @@ import {
   CardFooter
 } from "@/components/ui/card";
 import { getCurrentProfile, updateProfile, changePassword } from '../lib/api';
+import { updateUser } from '../store/authSlice';
 
 const ProfilePage = () => {
+  const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
   const [profileData, setProfileData] = useState({
     firstName: '',
@@ -82,7 +84,8 @@ const ProfilePage = () => {
     setMessage({ type: '', text: '' });
     
     try {
-      await updateProfile(profileData);
+      const response = await updateProfile(profileData);
+      dispatch(updateUser(response.data));
       setMessage({ type: 'success', text: 'Profile updated successfully!' });
       // Keep message for 3 seconds
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
@@ -300,7 +303,7 @@ const ProfilePage = () => {
                         name="address"
                         value={profileData.address} 
                         onChange={handleProfileChange}
-                        className="pl-12 min-h-[120px] pt-4 border-border/40 bg-background/20 dark:bg-black/30 focus:border-primary/60 focus:shadow-[0_0_20px_rgba(126,81,255,0.15)] transition-all font-bold text-lg resize-none placeholder:text-muted-foreground/20 leading-relaxed rounded-xl"
+                        className="pl-12 min-h-[120px] pt-4 border-border/40 bg-background/20 dark:bg-black/30 focus:border-primary/60 focus:shadow-[0_0_20px_rgba(126,81,255,0.15)] transition-all font-bold text-lg resize-none placeholder:text-muted-foreground/65 leading-relaxed rounded-xl"
                         placeholder="Department or residential coordinates"
                       />
                     </div>
