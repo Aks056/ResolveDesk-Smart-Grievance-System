@@ -117,14 +117,15 @@ smart-grievance-system/
 │   │   ├── pages/          # Application views (Dashboard, Grievances, Profile, Auth)
 │   │   └── store/          # Redux Toolkit state slices
 │   └── frontend.md         # Detailed Frontend Architecture Document 
-├── src/main/java/com/grievance/ # Spring Boot Backend Architecture
-│   ├── controller/         # REST API endpoints
-│   ├── entity/             # JPA Entities (MySQL Database Mappings)
-│   ├── repository/         # Data Access Layer
-│   ├── security/           # JWT & Spring Security Configurations
-│   └── service/            # Core Business Logic Implementations
-├── backend.md              # Detailed Backend Architecture Document
-└── pom.xml                 # Maven Configurations and Dependencies
+└── Backend/                # Spring Boot Backend application
+    ├── src/main/java/com/grievance/ # Backend Java Core
+    │   ├── controller/     # REST API endpoints
+    │   ├── entity/         # JPA Entities (MySQL Database Mappings)
+    │   ├── repository/     # Data Access Layer
+    │   ├── security/       # JWT & Spring Security Configurations
+    │   └── service/        # Core Business Logic Implementations
+    ├── backend.md          # Detailed Backend Architecture Document
+    └── pom.xml             # Maven Configurations and Dependencies
 ```
 
 ---
@@ -143,9 +144,10 @@ smart-grievance-system/
    ```sql
    CREATE DATABASE smart_grievance_db;
    ```
-2. **Backend Config**: Open up `src/main/resources/application.properties` and add your MySQL username/password credentials.
+2. **Backend Config**: Open up `Backend/src/main/resources/application.properties` and add your MySQL username/password credentials.
 3. **Start Backend**:
    ```bash
+   cd Backend
    mvn clean install
    mvn spring-boot:run
    ```
