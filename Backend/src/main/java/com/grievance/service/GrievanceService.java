@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.grievance.dto.request.UpdateStatusRequest;
 import com.grievance.dto.response.GrievanceResponse;
+import com.grievance.dto.response.GrievanceHistoryResponse;
 import com.grievance.entity.Grievance;
 import com.grievance.entity.GrievanceHistory;
 import com.grievance.entity.User;
@@ -119,7 +120,21 @@ public class GrievanceService {
     public List<GrievanceResponse> getRecentGrievances(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
-        return grievanceRepository.findTop5ByCitizenOrderByCreatedAtDesc(user).stream()
+        
+        List<Grievance> recentList;
+        if (user.getRole() == com.grievance.enums.Role.ADMIN) {
+            recentList = grievanceRepository.findAllByOrderByCreatedAtDesc().stream()
+                    .limit(5)
+                    .collect(Collectors.toList());
+        } else if (user.getRole() == com.grievance.enums.Role.OFFICER) {
+            recentList = grievanceRepository.findByAssignedOfficerOrderByCreatedAtDesc(user).stream()
+                    .limit(5)
+                    .collect(Collectors.toList());
+        } else {
+            recentList = grievanceRepository.findTop5ByCitizenOrderByCreatedAtDesc(user);
+        }
+
+        return recentList.stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
@@ -143,8 +158,9 @@ public class GrievanceService {
         User officer = userRepository.findById(officerId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", officerId));
 
-        if (grievance.getAssignedOfficer() == null || !grievance.getAssignedOfficer().getId().equals(officerId)) {
-            throw new UnauthorizedException("Only assigned officer can update this grievance");
+        boolean isAdmin = officer.getRole() == com.grievance.enums.Role.ADMIN;
+        if (!isAdmin && (grievance.getAssignedOfficer() == null || !grievance.getAssignedOfficer().getId().equals(officerId))) {
+            throw new UnauthorizedException("Only assigned officer or an administrator can update this grievance");
         }
 
         GrievanceStatus oldStatus = grievance.getStatus();
@@ -354,9 +370,49 @@ public GrievanceResponse acceptGrievance(Long grievanceId, Long officerId) {
 }
 
 @Transactional(readOnly = true)
-public List<GrievanceHistory> getGrievanceHistory(Long grievanceId) {
+public List<GrievanceHistoryResponse> getGrievanceHistory(Long grievanceId) {
     Grievance grievance = grievanceRepository.findById(grievanceId)
             .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
-    return historyRepository.findByGrievanceOrderByUpdatedAtDesc(grievance);
+    return historyRepository.findByGrievanceOrderByUpdatedAtDesc(grievance).stream()
+            .map(this::convertHistoryToResponse)
+            .collect(Collectors.toList());
+}
+
+private GrievanceHistoryResponse convertHistoryToResponse(GrievanceHistory history) {
+    return GrievanceHistoryResponse.builder()
+            .id(history.getId())
+            .status(history.getNewStatus().toString())
+            .remarks(history.getRemarks())
+            .updatedBy(history.getUpdatedByUser() != null ? history.getUpdatedByUser().getFullName() : "System")
+            .updatedAt(history.getUpdatedAt())
+            .build();
+}
+
+public GrievanceResponse updatePriority(Long grievanceId, Priority priority) {
+    log.info("Updating priority of grievance {} to {}", grievanceId, priority);
+    Grievance grievance = grievanceRepository.findById(grievanceId)
+            .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
+
+    Priority oldPriority = grievance.getPriority();
+    grievance.setPriority(priority);
+    Grievance saved = grievanceRepository.save(grievance);
+
+    GrievanceHistory history = GrievanceHistory.builder()
+            .grievance(saved)
+            .oldStatus(saved.getStatus())
+            .newStatus(saved.getStatus())
+            .remarks("Priority updated from " + oldPriority + " to " + priority)
+            .build();
+    historyRepository.save(history);
+
+    return convertToResponse(saved);
+}
+
+@Transactional(readOnly = true)
+public List<com.grievance.dto.response.UserResponse> getAllOfficers() {
+    log.info("Fetching all officers");
+    return userRepository.findByRole(com.grievance.enums.Role.OFFICER).stream()
+            .map(user -> modelMapper.map(user, com.grievance.dto.response.UserResponse.class))
+            .collect(Collectors.toList());
 }
 }

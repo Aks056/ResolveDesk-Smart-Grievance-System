@@ -82,7 +82,7 @@ public class GrievanceController {
 
     // ================= RECENT =================
     @GetMapping("/recent")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> getRecentGrievances(Authentication authentication) {
         Long userId = getUserId(authentication);
         return ResponseEntity.ok(grievanceService.getRecentGrievances(userId));
@@ -170,6 +170,22 @@ public class GrievanceController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> getGrievanceHistory(@PathVariable Long id) {
         return ResponseEntity.ok(grievanceService.getGrievanceHistory(id));
+    }
+
+    // ================= UPDATE PRIORITY =================
+    @PutMapping("/{id}/priority")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    public ResponseEntity<?> updateGrievancePriority(
+            @PathVariable Long id,
+            @RequestParam Priority priority) {
+        return ResponseEntity.ok(grievanceService.updatePriority(id, priority));
+    }
+
+    // ================= LIST OFFICERS FOR ASSIGNMENT =================
+    @GetMapping("/officers")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    public ResponseEntity<?> getAllOfficers() {
+        return ResponseEntity.ok(grievanceService.getAllOfficers());
     }
 
     // ================= COMMON METHOD =================

@@ -84,6 +84,13 @@ public class SecurityConfig {
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
 
+            // ❌ Return 401 Unauthorized for unauthenticated requests
+            .exceptionHandling(exception -> exception
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.sendError(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized");
+                })
+            )
+
             // 🔐 Authorization rules
             .authorizeHttpRequests(auth -> auth
 
