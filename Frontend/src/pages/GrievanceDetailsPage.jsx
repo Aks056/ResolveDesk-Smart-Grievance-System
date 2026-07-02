@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import api from '../lib/api';
-import { 
+import {   
   Card, CardContent, CardDescription, CardHeader, CardTitle 
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,8 @@ import {
   ExternalLink, Download, ShieldCheck
 } from "lucide-react";
 import ConfirmDialog from '../components/ConfirmDialog';
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const GrievanceDetailsPage = () => {
   const { id } = useParams();
@@ -30,6 +32,18 @@ const GrievanceDetailsPage = () => {
     type: "warning", 
     onConfirm: null 
   });
+  const [officers, setOfficers] = useState([]);
+  const [remarks, setRemarks] = useState("");
+  const [localPriority, setLocalPriority] = useState("");
+  const [localOfficerId, setLocalOfficerId] = useState("");
+  const [isInternal, setIsInternal] = useState(true);
+
+  useEffect(() => {
+    if (grievance) {
+      setLocalPriority(grievance.priority);
+      setLocalOfficerId(grievance.assignedOfficerId || "");
+    }
+  }, [grievance]);
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -42,6 +56,15 @@ const GrievanceDetailsPage = () => {
         ]);
         setGrievance(detailsRes.data);
         setHistory(historyRes.data || []);
+
+        if (user?.role === 'ADMIN' || user?.role === 'OFFICER') {
+          try {
+            const officersRes = await api.get('/grievances/officers');
+            setOfficers(officersRes.data || []);
+          } catch (err) {
+            console.error("Failed to fetch officers", err);
+          }
+        }
       } catch (err) {
         console.error("Failed to fetch grievance details", err);
       } finally {
@@ -49,7 +72,7 @@ const GrievanceDetailsPage = () => {
       }
     };
     fetchDetails();
-  }, [id]);
+  }, [id, user]);
 
   const handleClose = () => {
     setModal({
@@ -101,6 +124,120 @@ const GrievanceDetailsPage = () => {
     } finally {
       setClosing(false);
     }
+  };
+
+  const handlePriorityChange = (newPriority) => {
+    setLocalPriority(newPriority);
+  };
+
+  const handleAssignOfficer = (officerId) => {
+    setLocalOfficerId(officerId);
+  };
+
+  const handleUpdateTicket = async () => {
+    try {
+      setLoading(true);
+      const promises = [];
+      let updated = false;
+
+      // 1. Update priority if changed
+      if (localPriority !== grievance.priority) {
+        promises.push(api.put(`/grievances/${id}/priority?priority=${localPriority}`));
+        updated = true;
+      }
+
+      // 2. Update assignee if changed
+      const currentOfficerId = grievance.assignedOfficerId || "";
+      if (localOfficerId !== currentOfficerId) {
+        const url = user.role === 'ADMIN' 
+          ? `/admin/grievances/${id}/assign/${localOfficerId}`
+          : `/officer/grievances/${id}/assign/${localOfficerId}`;
+        if (localOfficerId) {
+          promises.push(api.post(url));
+          updated = true;
+        }
+      }
+
+      // 3. Add remarks if entered
+      if (remarks.trim()) {
+        const prefix = isInternal ? "[INTERNAL]" : "[PUBLIC]";
+        const formattedRemarks = `${prefix} ${remarks.trim()}`;
+        promises.push(api.put(`/grievances/${id}/status`, {
+          status: grievance.status,
+          remarks: formattedRemarks
+        }));
+        updated = true;
+        setRemarks("");
+      }
+
+      if (updated) {
+        await Promise.all(promises);
+        toast.success("Changes saved successfully");
+        
+        // Reload details
+        const [detailsRes, historyRes] = await Promise.all([
+          api.get(`/grievances/${id}`),
+          api.get(`/grievances/${id}/history`)
+        ]);
+        setGrievance(detailsRes.data);
+        setHistory(historyRes.data || []);
+      } else {
+        toast.info("No modifications detected");
+      }
+    } catch (err) {
+      console.error("Failed to update ticket", err);
+      toast.error("Failed to save changes");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStatusUpdate = async (newStatus, statusRemarks = "") => {
+    try {
+      setLoading(true);
+      
+      let formattedRemarks = statusRemarks;
+      if (statusRemarks && !statusRemarks.startsWith('[PUBLIC]') && !statusRemarks.startsWith('[INTERNAL]')) {
+        formattedRemarks = `[PUBLIC] ${statusRemarks}`;
+      }
+
+      if (newStatus === 'IN_PROGRESS' && user.role === 'OFFICER' && grievance.status === 'PENDING') {
+        await api.put(`/grievances/${id}/accept`);
+      } else {
+        await api.put(`/grievances/${id}/status`, {
+          status: newStatus,
+          remarks: formattedRemarks || `[PUBLIC] Status transitioned to ${newStatus}`
+        });
+      }
+      setRemarks("");
+      const [detailsRes, historyRes] = await Promise.all([
+        api.get(`/grievances/${id}`),
+        api.get(`/grievances/${id}/history`)
+      ]);
+      setGrievance(detailsRes.data);
+      setHistory(historyRes.data || []);
+    } catch (err) {
+      console.error("Failed to update status", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const displayHistory = useMemo(() => {
+    const isAdminOrOfficer = user?.role === 'ADMIN' || user?.role === 'OFFICER';
+    if (isAdminOrOfficer) return history;
+    return history.filter(item => !item.remarks?.startsWith('[INTERNAL]'));
+  }, [history, user]);
+
+  const formatRemark = (remark) => {
+    if (!remark) return "";
+    if (remark.startsWith('[INTERNAL]')) {
+      return remark.substring('[INTERNAL]'.length).trim();
+    }
+    if (remark.startsWith('[PUBLIC]')) {
+      return remark.substring('[PUBLIC]'.length).trim();
+    }
+    return remark;
   };
 
   const getStatusInfo = (status) => {
@@ -204,31 +341,60 @@ const GrievanceDetailsPage = () => {
                 <div className="text-lg leading-relaxed font-medium whitespace-pre-wrap">
                   {grievance.description}
                 </div>
-                
-                {/* Visual Evidence */}
-                {grievance.imageUrl && (
-                  <div className="space-y-3 pt-6 border-t border-border/50">
-                    <div className="flex items-center justify-between">
-                      <h4 className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                        <ImageIcon className="h-4 w-4" />
-                        Evidence Artifact
-                      </h4>
-                      <Button variant="ghost" size="sm" asChild className="h-8 text-primary hover:bg-primary/10">
-                        <a href={grievance.imageUrl} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="h-3 w-3 mr-2" /> View Original
-                        </a>
-                      </Button>
+              </CardContent>
+            </Card>
+
+            {/* Attachments Section */}
+            <Card className="border-none shadow-sm ring-1 ring-border overflow-hidden bg-card/40 backdrop-blur-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4 text-indigo-500" />
+                  Attachments & Evidence
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {grievance.imageUrl ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 rounded-2xl bg-background border border-border/40">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-indigo-500/10 flex items-center justify-center">
+                          <ImageIcon className="h-5 w-5 text-indigo-600" />
+                        </div>
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-bold truncate max-w-[200px]">Evidence_Artifact.png</p>
+                          <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Image file</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" asChild>
+                          <a href={grievance.imageUrl} target="_blank" rel="noopener noreferrer" title="View Original">
+                            <ExternalLink className="h-4 w-4 text-primary" />
+                          </a>
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" asChild>
+                          <a href={grievance.imageUrl} download="Evidence_Artifact.png" title="Download">
+                            <Download className="h-4 w-4 text-primary" />
+                          </a>
+                        </Button>
+                      </div>
                     </div>
+                    
                     <div className="relative group rounded-3xl overflow-hidden border border-border/40 bg-muted/20">
                       <img 
                         src={grievance.imageUrl} 
                         alt="Evidence" 
-                        className="w-full object-cover max-h-[500px] transition-transform duration-700 group-hover:scale-105"
+                        className="w-full object-cover max-h-[300px] transition-transform duration-700 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-                        <ShieldCheck className="h-10 w-10 text-white animate-pulse" />
+                        <a href={grievance.imageUrl} target="_blank" rel="noopener noreferrer" className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white font-bold text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-white/25 transition-all">
+                          <ExternalLink className="h-4 w-4" /> Open Fullscreen
+                        </a>
                       </div>
                     </div>
+                  </div>
+                ) : (
+                  <div className="py-6 text-center text-sm font-medium text-muted-foreground italic">
+                    No attachments or evidence files uploaded.
                   </div>
                 )}
               </CardContent>
@@ -241,10 +407,10 @@ const GrievanceDetailsPage = () => {
                 Processing Timeline
               </h3>
               <div className="space-y-0 pl-1">
-                {history.length > 0 ? history.map((item, index) => (
+                {displayHistory.length > 0 ? displayHistory.map((item, index) => (
                   <div key={item.id} className="relative pl-8 pb-8 last:pb-0">
                     {/* Vertical Line */}
-                    {index !== history.length - 1 && (
+                    {index !== displayHistory.length - 1 && (
                       <div className="absolute left-[11px] top-6 bottom-0 w-[2px] bg-indigo-600/20" />
                     )}
                     {/* Circle */}
@@ -254,10 +420,17 @@ const GrievanceDetailsPage = () => {
                     
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-black uppercase tracking-widest text-[#4F46E5]">{item.status}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black uppercase tracking-widest text-[#4F46E5]">{item.status}</span>
+                          {item.remarks?.startsWith('[INTERNAL]') && (
+                            <Badge className="bg-amber-500/10 text-amber-600 border-none font-bold uppercase text-[8px] px-1.5 py-0.5">
+                              Internal Note
+                            </Badge>
+                          )}
+                        </div>
                         <span className="text-[10px] font-bold text-muted-foreground">{new Date(item.updatedAt).toLocaleString()}</span>
                       </div>
-                      <p className="font-bold text-base">{item.remarks || "No supplementary comment provided."}</p>
+                      <p className="font-bold text-base">{formatRemark(item.remarks) || "No supplementary comment provided."}</p>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground/60 font-semibold">
                         <User className="h-3 w-3" />
                         Processed by {item.updatedBy || "System Core"}
@@ -275,8 +448,8 @@ const GrievanceDetailsPage = () => {
           </div>
 
           {/* Sidebar Info - Right Col */}
-          <div className="space-y-8">
-            <Card className="border-none shadow-xl shadow-indigo-600/5 ring-1 ring-indigo-600/10 bg-[#4F46E5]/[0.02] overflow-hidden sticky top-24">
+          <div className="space-y-8 sticky top-24 self-start">
+            <Card className="border-none shadow-xl shadow-indigo-600/5 ring-1 ring-indigo-600/10 bg-[#4F46E5]/[0.02] overflow-hidden">
               <div className="h-1 bg-[#4F46E5]" />
               <CardHeader>
                 <CardTitle className="text-base font-black uppercase tracking-wider flex items-center gap-3">
@@ -350,6 +523,139 @@ const GrievanceDetailsPage = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Admin / Officer Operational Controls */}
+            {(user?.role === 'ADMIN' || user?.role === 'OFFICER') && (
+              <Card className="border-none shadow-xl shadow-indigo-600/5 ring-1 ring-indigo-600/10 bg-[#4F46E5]/[0.02] overflow-hidden">
+                <div className="h-1 bg-amber-500" />
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-black uppercase tracking-wider flex items-center gap-3">
+                    <ShieldCheck className="h-5 w-5 text-amber-500" />
+                    Operational Panel
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Change Priority */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Urgency level</label>
+                    <select 
+                      value={localPriority} 
+                      onChange={(e) => handlePriorityChange(e.target.value)}
+                      className="w-full p-2.5 rounded-xl bg-background border border-border text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value="LOW">LOW</option>
+                      <option value="MEDIUM">MEDIUM</option>
+                      <option value="HIGH">HIGH</option>
+                    </select>
+                  </div>
+
+                  {/* Reassign Officer */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Assign Officer</label>
+                    <select 
+                      value={localOfficerId} 
+                      onChange={(e) => handleAssignOfficer(e.target.value)}
+                      className="w-full p-2.5 rounded-xl bg-background border border-border text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value="">-- Unassigned --</option>
+                      {officers.map(off => (
+                        <option key={off.id} value={off.id}>{off.fullName} ({off.departmentName || 'No Department'})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <Separator className="bg-indigo-600/10" />
+
+                  {/* Status updates with remarks */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Remarks Type</label>
+                      <div className="flex items-center gap-1 bg-background border border-border/40 p-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider">
+                        <button
+                          type="button"
+                          onClick={() => setIsInternal(true)}
+                          className={cn(
+                            "px-2 py-0.5 rounded transition-all cursor-pointer",
+                            isInternal 
+                              ? "bg-amber-500 text-white shadow-sm" 
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          Internal
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsInternal(false)}
+                          className={cn(
+                            "px-2 py-0.5 rounded transition-all cursor-pointer",
+                            !isInternal 
+                              ? "bg-amber-500 text-white shadow-sm" 
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          Public
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Remarks & Note</label>
+                      <textarea 
+                        value={remarks}
+                        onChange={(e) => setRemarks(e.target.value)}
+                        placeholder={isInternal ? "Type internal triage notes (officers only)..." : "Type reply to citizen..."}
+                        className="w-full p-2.5 rounded-xl bg-background border border-border text-sm font-semibold placeholder:font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 h-20 resize-none"
+                      />
+                    </div>
+
+                    <Button
+                      onClick={handleUpdateTicket}
+                      className="w-full h-11 bg-amber-500 hover:bg-amber-600 text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all cursor-pointer mt-2"
+                    >
+                      Update Ticket
+                    </Button>
+
+                    <Separator className="bg-indigo-600/10 my-2" />
+
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Direct Status Actions</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {grievance.status === 'PENDING' && (
+                        <Button 
+                          onClick={() => handleStatusUpdate('IN_PROGRESS')}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase tracking-widest text-[9px] h-9 rounded-lg cursor-pointer"
+                        >
+                          Accept Case
+                        </Button>
+                      )}
+                      {grievance.status !== 'RESOLVED' && grievance.status !== 'CLOSED_BY_USER' && grievance.status !== 'REJECTED' && (
+                        <>
+                          <Button 
+                            onClick={() => handleStatusUpdate('RESOLVED', remarks)}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold uppercase tracking-widest text-[9px] h-9 rounded-lg cursor-pointer"
+                          >
+                            Resolve Case
+                          </Button>
+                          <Button 
+                            onClick={() => handleStatusUpdate('REJECTED', remarks)}
+                            className="bg-rose-600 hover:bg-rose-700 text-white font-bold uppercase tracking-widest text-[9px] h-9 rounded-lg cursor-pointer"
+                          >
+                            Reject Case
+                          </Button>
+                        </>
+                      )}
+                      {grievance.status !== 'CLOSED_BY_USER' && (
+                        <Button 
+                          onClick={() => handleStatusUpdate('CLOSED_BY_USER', remarks || "Closed by Admin/Officer")}
+                          className="col-span-2 bg-slate-700 hover:bg-slate-800 text-white font-bold uppercase tracking-widest text-[9px] h-9 rounded-lg cursor-pointer"
+                        >
+                          Close Grievance
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
