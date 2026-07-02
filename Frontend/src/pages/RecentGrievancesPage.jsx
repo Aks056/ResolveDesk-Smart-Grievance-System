@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import api from '../lib/api';
 import { 
   Card
@@ -8,12 +9,24 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
-  Search, ChevronRight, Building2, User2, Zap, Droplets, HeartPulse, GraduationCap, ShieldCheck, Wrench, ArrowUpDown
+  Search, ChevronRight, Building2, User2, Zap, Droplets, HeartPulse, GraduationCap, ShieldCheck, Wrench, ArrowUpDown,
+  LayoutGrid, List, TableProperties, UserPlus
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem
+} from "@/components/ui/dropdown-menu";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+} from "@/components/ui/table";
 
 const RecentGrievancesPage = () => {
   const navigate = useNavigate();
+  const { user } = useSelector((state) => state.auth);
+  const isAdmin = user?.role === 'ADMIN';
+
   const [grievances, setGrievances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -21,6 +34,8 @@ const RecentGrievancesPage = () => {
   const [filterUrgency, setFilterUrgency] = useState('ALL');
   const [filterDepartment, setFilterDepartment] = useState('ALL');
   const [sortOrder, setSortOrder] = useState('NEWEST');
+  const [viewMode, setViewMode] = useState('list'); // 'grid', 'list', 'table'
+  const [officers, setOfficers] = useState([]);
   
   const parseDate = (date) => {
     if (Array.isArray(date)) {
@@ -44,6 +59,61 @@ const RecentGrievancesPage = () => {
     fetchGrievances();
   }, []);
 
+  useEffect(() => {
+    if (isAdmin) {
+      const fetchOfficers = async () => {
+        try {
+          const res = await api.get('/api/grievances/officers');
+          setOfficers(res.data || []);
+        } catch (err) {
+          console.error("Failed to fetch officers", err);
+        }
+      };
+      fetchOfficers();
+    }
+  }, [isAdmin]);
+  const getPriorityBorder = (priority) => {
+    switch (priority) {
+      case 'HIGH': return 'border-l-4 border-l-rose-500';
+      case 'MEDIUM': return 'border-l-4 border-l-amber-500';
+      case 'LOW': return 'border-l-4 border-l-emerald-500';
+      default: return 'border-l-4 border-l-slate-300';
+    }
+  };
+
+  const displayOfficers = useMemo(() => {
+    return officers.length > 0 ? officers : [
+      { id: 101, fullName: "Dr. Alok Mishra", departmentName: "Electricity Dept" },
+      { id: 102, fullName: "Prof. Sunita Sharma", departmentName: "Academic Section" },
+      { id: 103, fullName: "Er. Ramesh Verma", departmentName: "Water Works" },
+      { id: 104, fullName: "Dr. Rajesh Gupta", departmentName: "Medical & Health" }
+    ];
+  }, [officers]);
+
+  const handleAssignOfficer = async (grievanceId, officerId) => {
+    try {
+      if (officerId) {
+        await api.post(`/admin/grievances/${grievanceId}/assign/${officerId}`);
+        toast.success("Officer assigned successfully");
+        
+        setGrievances(prev => prev.map(g => {
+          if (g.id === grievanceId) {
+            const off = displayOfficers.find(o => o.id === parseInt(officerId));
+            return {
+              ...g,
+              status: 'ASSIGNED',
+              assignedOfficerId: officerId,
+              assignedOfficerName: off ? off.fullName : 'Assigned'
+            };
+          }
+          return g;
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to assign officer", err);
+      toast.error("Failed to assign officer");
+    }
+  };
   const uniqueDepartments = useMemo(() => {
     return Array.from(new Set(grievances.map(g => g.departmentName))).filter(Boolean).sort();
   }, [grievances]);
@@ -71,23 +141,72 @@ const RecentGrievancesPage = () => {
     });
   }, [grievances, searchTerm, filterStatus, filterUrgency, filterDepartment, sortOrder]);
 
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'RESOLVED': return <Badge className="rounded-full bg-green-500/10 text-green-600 border-green-500/20 px-3">Resolved</Badge>;
-      case 'PENDING': return <Badge className="rounded-full bg-yellow-500/10 text-yellow-600 border-yellow-500/20 px-3">Pending</Badge>;
-      case 'IN_PROGRESS': return <Badge className="rounded-full bg-indigo-500/10 text-indigo-600 border-indigo-500/20 px-3">In Progress</Badge>;
-      case 'CLOSED_BY_USER': return <Badge className="rounded-full bg-rose-500/10 text-rose-600 border-rose-500/20 px-3">Archived</Badge>;
-      default: return <Badge variant="outline" className="rounded-full px-3">{status}</Badge>;
+  // Configuration lookup mappings for status and priority styling
+  const statusConfig = {
+    RESOLVED: {
+      label: 'Resolved',
+      classes: 'bg-emerald-100/80 text-emerald-800 border-emerald-200/30 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/30'
+    },
+    PENDING: {
+      label: 'Pending',
+      classes: 'bg-amber-100/80 text-amber-800 border-amber-200/30 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/30'
+    },
+    IN_PROGRESS: {
+      label: 'In Progress',
+      classes: 'bg-blue-100/80 text-blue-800 border-blue-200/30 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/30'
+    },
+    REJECTED: {
+      label: 'Rejected',
+      classes: 'bg-rose-100/80 text-rose-800 border-rose-200/30 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/30'
+    },
+    CLOSED_BY_USER: {
+      label: 'Archived',
+      classes: 'bg-slate-100/80 text-slate-700 border-slate-200/30 dark:bg-slate-800/40 dark:text-slate-300 dark:border-slate-700/30'
     }
   };
 
-  const getPriorityBadge = (priority) => {
-    switch (priority) {
-      case 'HIGH': return <Badge className="rounded-full border text-white bg-red-500 border-red-600 px-3 hover:bg-red-600 transition-colors">High</Badge>;
-      case 'MEDIUM': return <Badge variant="outline" className="rounded-full border-orange-500/20 text-orange-600 bg-orange-500/10 px-3">Medium</Badge>;
-      case 'LOW': return <Badge variant="outline" className="rounded-full border-green-500/20 text-green-600 bg-green-500/10 px-3">Low</Badge>;
-      default: return <Badge variant="outline" className="rounded-full px-3">{priority}</Badge>;
+  const priorityConfig = {
+    HIGH: {
+      label: 'High',
+      dotClass: 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]',
+      classes: 'bg-rose-50/50 text-rose-700 border-rose-200/30 dark:bg-rose-950/10 dark:text-rose-300 dark:border-rose-900/20'
+    },
+    MEDIUM: {
+      label: 'Medium',
+      dotClass: 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]',
+      classes: 'bg-amber-50/50 text-amber-700 border-amber-200/30 dark:bg-amber-950/10 dark:text-amber-300 dark:border-amber-900/20'
+    },
+    LOW: {
+      label: 'Low',
+      dotClass: 'bg-slate-400',
+      classes: 'bg-slate-50/50 text-slate-600 border-slate-200/30 dark:bg-slate-800/20 dark:text-slate-300 dark:border-slate-700/20'
     }
+  };
+
+  const getStatusBadge = (status) => {
+    const config = statusConfig[status] || {
+      label: status,
+      classes: 'bg-slate-100 text-slate-800 border-slate-200'
+    };
+    return (
+      <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-semibold border ${config.classes} transition-all duration-300`}>
+        {config.label}
+      </span>
+    );
+  };
+
+  const getPriorityBadge = (priority) => {
+    const config = priorityConfig[priority] || {
+      label: priority,
+      dotClass: 'bg-slate-400',
+      classes: 'bg-slate-50 text-slate-600 border-slate-200'
+    };
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold border ${config.classes} transition-all duration-300`}>
+        <span className={`h-2 w-2 rounded-full ${config.dotClass}`} />
+        {config.label}
+      </span>
+    );
   };
 
   const getStatusBorder = (status) => {
@@ -101,15 +220,15 @@ const RecentGrievancesPage = () => {
     }
   };
 
-  const getDepartmentIcon = (deptName) => {
+  const getDepartmentIcon = (deptName, sizeClass = "h-6 w-6") => {
     const name = (deptName || '').toLowerCase();
-    if (name.includes('electr')) return <Zap className="h-6 w-6" />;
-    if (name.includes('water')) return <Droplets className="h-6 w-6" />;
-    if (name.includes('health') || name.includes('medical')) return <HeartPulse className="h-6 w-6" />;
-    if (name.includes('academic') || name.includes('educat')) return <GraduationCap className="h-6 w-6" />;
-    if (name.includes('security') || name.includes('police')) return <ShieldCheck className="h-6 w-6" />;
-    if (name.includes('maintain') || name.includes('infrastructure')) return <Wrench className="h-6 w-6" />;
-    return <Building2 className="h-6 w-6" />;
+    if (name.includes('electr')) return <Zap className={sizeClass} />;
+    if (name.includes('water')) return <Droplets className={sizeClass} />;
+    if (name.includes('health') || name.includes('medical')) return <HeartPulse className={sizeClass} />;
+    if (name.includes('academic') || name.includes('educat')) return <GraduationCap className={sizeClass} />;
+    if (name.includes('security') || name.includes('police')) return <ShieldCheck className={sizeClass} />;
+    if (name.includes('maintain') || name.includes('infrastructure')) return <Wrench className={sizeClass} />;
+    return <Building2 className={sizeClass} />;
   };
 
   return (
@@ -143,9 +262,9 @@ const RecentGrievancesPage = () => {
             </div>
 
             {/* Top Level Dropdowns */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 w-full md:w-auto overflow-hidden">
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                <Select value={filterStatus} onValueChange={setFilterStatus}>
-                 <SelectTrigger className="h-12 rounded-xl bg-background border-border/40 font-bold text-xs uppercase tracking-wider">
+                 <SelectTrigger className="h-12 rounded-xl bg-background border-border/40 font-bold text-xs uppercase tracking-wider min-w-[130px]">
                    <div className="flex items-center gap-2">
                      <span className="text-muted-foreground">Status:</span> {filterStatus === 'CLOSED_BY_USER' ? 'ARCHIVED' : filterStatus}
                    </div>
@@ -158,7 +277,7 @@ const RecentGrievancesPage = () => {
                </Select>
 
                <Select value={filterUrgency} onValueChange={setFilterUrgency}>
-                 <SelectTrigger className="h-12 rounded-xl bg-background border-border/40 font-bold text-xs uppercase tracking-wider">
+                 <SelectTrigger className="h-12 rounded-xl bg-background border-border/40 font-bold text-xs uppercase tracking-wider min-w-[130px]">
                    <div className="flex items-center gap-2">
                      <span className="text-muted-foreground">Urgency:</span> {filterUrgency}
                    </div>
@@ -171,8 +290,8 @@ const RecentGrievancesPage = () => {
                </Select>
 
                <Select value={filterDepartment} onValueChange={setFilterDepartment}>
-                 <SelectTrigger className="h-12 rounded-xl bg-background border-border/40 font-bold text-xs uppercase tracking-wider hidden lg:flex">
-                   <div className="flex items-center gap-2 truncate max-w-[120px]">
+                 <SelectTrigger className="h-12 rounded-xl bg-background border-border/40 font-bold text-xs uppercase tracking-wider min-w-[140px]">
+                   <div className="flex items-center gap-2 truncate max-w-[150px]">
                      <span className="text-muted-foreground">Dept:</span> {filterDepartment}
                    </div>
                  </SelectTrigger>
@@ -185,7 +304,7 @@ const RecentGrievancesPage = () => {
                </Select>
 
                <Select value={sortOrder} onValueChange={setSortOrder}>
-                 <SelectTrigger className="h-12 rounded-xl bg-background border-border/40 font-bold text-xs uppercase tracking-wider">
+                 <SelectTrigger className="h-12 rounded-xl bg-background border-border/40 font-bold text-xs uppercase tracking-wider min-w-[150px]">
                    <div className="flex items-center gap-2">
                      <ArrowUpDown className="h-3.5 w-3.5 opacity-50" /> {sortOrder}
                    </div>
@@ -195,14 +314,45 @@ const RecentGrievancesPage = () => {
                    <SelectItem value="URGENCY" className="font-bold text-xs uppercase tracking-wider">HIGHEST URGENCY</SelectItem>
                  </SelectContent>
                </Select>
+
+               {/* Grid / List / Table View Toggle */}
+               <div className="flex items-center bg-background border border-border/40 p-1 rounded-xl h-12 shrink-0">
+                 <Button
+                   variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                   size="icon"
+                   className="h-10 w-10 rounded-lg"
+                   onClick={() => setViewMode('grid')}
+                   title="Grid View"
+                 >
+                   <LayoutGrid className="h-4.5 w-4.5 text-muted-foreground" />
+                 </Button>
+                 <Button
+                   variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                   size="icon"
+                   className="h-10 w-10 rounded-lg"
+                   onClick={() => setViewMode('list')}
+                   title="List View"
+                 >
+                   <List className="h-4.5 w-4.5 text-muted-foreground" />
+                 </Button>
+                 <Button
+                   variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                   size="icon"
+                   className="h-10 w-10 rounded-lg"
+                   onClick={() => setViewMode('table')}
+                   title="Table View"
+                 >
+                   <TableProperties className="h-4.5 w-4.5 text-muted-foreground" />
+                 </Button>
+               </div>
             </div>
           </div>
         </div>
 
         {/* Grievances List */}
-        <div className="grid gap-4 mt-8">
+        <div>
           {loading ? (
-            <div className="space-y-4">
+            <div className="grid gap-4 mt-8">
               {[1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="w-full h-[150px] bg-card/60 border rounded-2xl animate-pulse flex p-6 gap-6">
                    <div className="w-12 h-12 rounded-xl bg-muted/60 hidden sm:block shrink-0"></div>
@@ -215,55 +365,177 @@ const RecentGrievancesPage = () => {
               ))}
             </div>
           ) : filteredGrievances.length > 0 ? (
-            filteredGrievances.map((g) => (
-              <Card 
-                key={g.id} 
-                className={`group border-y border-r shadow-sm ring-1 ring-border/30 hover:ring-primary/40 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:hover:shadow-[0_8px_30px_rgb(255,255,255,0.02)] transition-all duration-300 cursor-pointer overflow-hidden bg-card/50 backdrop-blur-sm -translate-y-0 hover:-translate-y-1 ${getStatusBorder(g.status)} rounded-xl`}
-                onClick={() => navigate(`/grievances/${g.id}`)}
-              >
-                <div className="flex flex-col p-5 sm:p-6 gap-4">
-                  {/* Row 1: ID & Date */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black font-mono text-primary/70 tracking-widest bg-primary/5 px-2 py-1 rounded-md">#GRV-{String(g.id).padStart(4, '0')}</span>
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground tracking-widest uppercase">
-                      <User2 className="h-3 w-3 inline opacity-50" /> {g.citizenName || 'ANONYMOUS'}
-                      <span className="mx-1 opacity-30">&bull;</span>
-                      <span>{parseDate(g.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+            viewMode === 'table' ? (
+              <div className="rounded-xl border overflow-hidden bg-card/50 backdrop-blur-sm mt-8 shadow-sm">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="w-[100px] pl-6">ID</TableHead>
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right pr-6">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredGrievances.map((g) => (
+                      <TableRow 
+                        key={g.id} 
+                        className="group hover:bg-primary/[0.02] active:bg-primary/[0.05] transition-colors cursor-pointer"
+                        onClick={() => navigate(`/grievances/${g.id}`)}
+                      >
+                        <TableCell className="relative pl-6 font-mono text-[11px] font-bold text-muted-foreground group-hover:text-primary transition-colors">
+                          <div className={cn(
+                            "absolute left-2.5 top-2.5 bottom-2.5 w-1 rounded-full",
+                            g.priority === 'HIGH' ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]" :
+                            g.priority === 'MEDIUM' ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]" :
+                            "bg-emerald-500"
+                          )} />
+                          #GRV-{String(g.id).padStart(4, '0')}
+                        </TableCell>
+                        <TableCell className="font-semibold max-w-[200px] truncate">{g.title}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                            <span className="text-primary">{getDepartmentIcon(g.departmentName, "h-4 w-4")}</span>
+                            <span className="truncate max-w-[120px]">{g.departmentName}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{getPriorityBadge(g.priority)}</TableCell>
+                        <TableCell>{getStatusBadge(g.status)}</TableCell>
+                        <TableCell className="text-right pr-6" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-2">
+                            {isAdmin && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button 
+                                    variant="outline" 
+                                    size="icon" 
+                                    className="h-8 w-8 rounded-lg border-primary/20 text-primary hover:bg-primary/5 cursor-pointer"
+                                    title="Quick Assign"
+                                  >
+                                    <UserPlus className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56 bg-card border max-h-60 overflow-y-auto">
+                                  {displayOfficers.map(off => (
+                                    <DropdownMenuItem 
+                                      key={off.id} 
+                                      onClick={() => handleAssignOfficer(g.id, off.id)}
+                                      className="cursor-pointer text-xs font-semibold"
+                                    >
+                                      {off.fullName} ({off.departmentName || 'No Dept'})
+                                    </DropdownMenuItem>
+                                  ))}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-8 text-xs font-bold uppercase tracking-wider text-primary hover:bg-primary/5 rounded-lg flex items-center gap-1 cursor-pointer"
+                              onClick={() => navigate(`/grievances/${g.id}`)}
+                            >
+                              <span>View Case</span>
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className={cn(
+                "grid gap-4 mt-8",
+                viewMode === 'grid' ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
+              )}>
+                {filteredGrievances.map((g) => (
+                  <Card 
+                    key={g.id} 
+                    className={`group border-y border-r shadow-sm ring-1 ring-border/30 hover:ring-primary/40 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:hover:shadow-[0_8px_30px_rgb(255,255,255,0.02)] transition-all duration-300 cursor-pointer overflow-hidden bg-card/50 backdrop-blur-sm -translate-y-0 hover:-translate-y-1 ${getPriorityBorder(g.priority)} rounded-xl`}
+                    onClick={() => navigate(`/grievances/${g.id}`)}
+                  >
+                    <div className="flex flex-col p-5 sm:p-6 gap-4 h-full justify-between">
+                      <div className="space-y-4">
+                        {/* Row 1: ID & Date */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black font-mono text-primary/70 tracking-widest bg-primary/5 px-2 py-1 rounded-md">#GRV-{String(g.id).padStart(4, '0')}</span>
+                          <div className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground tracking-widest uppercase">
+                            <User2 className="h-3 w-3 inline opacity-50" /> {g.citizenName || 'ANONYMOUS'}
+                            <span className="mx-1 opacity-30">&bull;</span>
+                            <span>{parseDate(g.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                          </div>
+                        </div>
+
+                        {/* Row 2: Title & Category Icon */}
+                        <div className="flex items-center gap-4 py-1">
+                           <div className={`hidden sm:flex h-12 w-12 items-center justify-center rounded-xl shrink-0 transition-all bg-muted/30 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary group-hover:scale-110 shadow-sm`}>
+                             {getDepartmentIcon(g.departmentName)}
+                           </div>
+                           <div className="flex-1 space-y-1 shrink min-w-0">
+                             <h3 className="text-xl md:text-2xl font-black tracking-tight group-hover:text-primary transition-colors line-clamp-1 leading-tight">{g.title}</h3>
+                             <div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase opacity-80 tracking-widest">
+                               {g.departmentName}
+                             </div>
+                           </div>
+                        </div>
+
+                        {/* Row 3: Description preview */}
+                        <p className="text-sm text-foreground/70 line-clamp-2 sm:pl-16 font-medium leading-relaxed">{g.description}</p>
+                      </div>
+
+                      {/* Row 4: Badges */}
+                      <div className="flex flex-wrap items-center justify-between sm:pl-16 pt-3 mt-1 border-t border-border/30 gap-2">
+                         <div className="flex items-center gap-2">
+                           {getPriorityBadge(g.priority)}
+                           {getStatusBadge(g.status)}
+                         </div>
+                         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                           {isAdmin && (
+                             <DropdownMenu>
+                               <DropdownMenuTrigger asChild>
+                                 <Button 
+                                   variant="outline" 
+                                   size="sm" 
+                                   className="h-8 gap-1.5 px-3 text-xs font-bold uppercase tracking-wider border-primary/20 text-primary hover:bg-primary/5 rounded-lg cursor-pointer"
+                                 >
+                                   <UserPlus className="h-3.5 w-3.5" />
+                                   Assign
+                                 </Button>
+                               </DropdownMenuTrigger>
+                               <DropdownMenuContent align="end" className="w-56 bg-card border max-h-60 overflow-y-auto">
+                                 {displayOfficers.map(off => (
+                                   <DropdownMenuItem 
+                                     key={off.id} 
+                                     onClick={() => handleAssignOfficer(g.id, off.id)}
+                                     className="cursor-pointer text-xs font-semibold"
+                                   >
+                                     {off.fullName} ({off.departmentName || 'No Dept'})
+                                   </DropdownMenuItem>
+                                 ))}
+                               </DropdownMenuContent>
+                             </DropdownMenu>
+                           )}
+                           <Button 
+                             variant="ghost" 
+                             size="sm" 
+                             className="h-8 text-xs font-bold uppercase tracking-wider text-primary hover:bg-primary/5 rounded-lg flex items-center gap-1 cursor-pointer"
+                             onClick={() => navigate(`/grievances/${g.id}`)}
+                           >
+                             <span>View Case</span>
+                             <ChevronRight className="h-3.5 w-3.5" />
+                           </Button>
+                         </div>
+                      </div>
                     </div>
-                  </div>
-
-                  {/* Row 2: Title & Category Icon */}
-                  <div className="flex items-center gap-4 py-1">
-                     <div className={`hidden sm:flex h-12 w-12 items-center justify-center rounded-xl shrink-0 transition-all bg-muted/30 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary group-hover:scale-110 shadow-sm`}>
-                       {getDepartmentIcon(g.departmentName)}
-                     </div>
-                     <div className="flex-1 space-y-1 shrink min-w-0">
-                       <h3 className="text-xl md:text-2xl font-black tracking-tight group-hover:text-primary transition-colors line-clamp-1 leading-tight">{g.title}</h3>
-                       <div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase opacity-80 tracking-widest">
-                         {g.departmentName}
-                       </div>
-                     </div>
-                  </div>
-
-                  {/* Row 3: Description preview */}
-                  <p className="text-sm text-foreground/70 line-clamp-2 sm:pl-16 font-medium leading-relaxed">{g.description}</p>
-
-                  {/* Row 4: Badges */}
-                  <div className="flex flex-wrap items-center justify-between sm:pl-16 pt-3 mt-1 border-t border-border/30">
-                     <div className="flex items-center gap-2">
-                       {getPriorityBadge(g.priority)}
-                       {getStatusBadge(g.status)}
-                     </div>
-                     <div className="p-2 sm:px-4 sm:py-2 rounded-full sm:rounded-lg sm:bg-muted/30 hover:bg-black/5 group-hover:translate-x-1 sm:group-hover:translate-x-0 sm:group-hover:bg-primary/10 transition-all flex items-center gap-2">
-                       <span className="hidden sm:inline-block text-[10px] font-black uppercase tracking-widest text-primary/80">View Case</span>
-                       <ChevronRight className="h-4 w-4 opacity-50 group-hover:opacity-100 group-hover:text-primary" />
-                     </div>
-                  </div>
-                </div>
-              </Card>
-            ))
+                  </Card>
+                ))}
+              </div>
+            )
           ) : (
-            <Card className="py-24 border-dashed border-2 bg-transparent text-center space-y-4">
+            <Card className="py-24 border-dashed border-2 bg-transparent text-center space-y-4 mt-8">
               <div className="flex justify-center">
                 <div className="p-6 rounded-full bg-muted/30 animate-pulse">
                   <Search className="h-10 w-10 text-muted-foreground/30" />
