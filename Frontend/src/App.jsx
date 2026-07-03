@@ -2,6 +2,7 @@ import React from 'react'
 import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import NewGrievancePage from './pages/NewGrievancePage';
 import ProfilePage from './pages/ProfilePage';
@@ -37,7 +38,8 @@ const App = () => {
         {
           element: <PublicRoute />,
           children: [
-            { path: "/login", element: <LoginPage /> }
+            { path: "/login", element: <LoginPage /> },
+            { path: "/register", element: <RegisterPage /> }
           ]
         },
         {
