@@ -14,27 +14,6 @@ The project follows a **Decoupled Architecture** with a clear separation between
 
 ### 🔄 Project Flow & Logic
 
-```mermaid
-sequenceDiagram
-    participant Citizen
-    participant React UI
-    participant Spring API
-    participant DB
-    participant Officer
-    participant Admin
-
-    Citizen->>API: 1. Register/Login
-    API-->>Citizen: 2. Return JWT Token
-    Citizen->>API: 3. Submit Grievance (with Image)
-    API->>DB: 4. Store Grievance (Status: PENDING)
-    Admin->>API: 5. Assign Grievance to Officer
-    API->>DB: 6. Update Status: IN_PROGRESS
-    Officer->>API: 7. View Assigned Grievances
-    Officer->>API: 8. Resolve/Action Grievance
-    API->>DB: 9. Update Status: RESOLVED + Log History
-    Citizen->>API: 10. Track Status & View Resolution
-```
-
 ![Project Flow Logic](https://mermaid.ink/img/c2VxdWVuY2VEaWFncmFtCiAgICBwYXJ0aWNpcGFudCBDaXRpemVuCiAgICBwYXJ0aWNpcGFudCBBUEkKICAgIHBhcnRpY2lwYW50IERCCiAgICBwYXJ0aWNpcGFudCBPZmZpY2VyCiAgICBwYXJ0aWNpcGFudCBBZG1pbgoKICAgIENpdGl6ZW4tPj5BUEk6IDEuIFJlZ2lzdGVyL0xvZ2luCiAgICBBUEktLT4+Q2l0aXplbjogMi4gUmV0dXJuIEpXVCBUb2tlbgogICAgQ2l0aXplbi0+PkFQSTogMy4gU3VibWl0IEdyaWV2YW5jZSAod2l0aCBJbWFnZSkKICAgIEFQSS0+PkRCOiA0LiBTdG9yZSBHcmlldmFuY2UgKFN0YXR1czogUEVORElORykKICAgIEFkbWluLT4+QVBJOiA1LiBBc3NpZ24gR3JpZXZhbmNlIHRvIE9mZmljZXIKICAgIEFQSS0+PkRCOiA2LiBVcGRhdGUgU3RhdHVzOiBJTl9QUk9HUkVTUwogICAgT2ZmaWNlci0+PkFQSTogNy4gVmlldyBBc3NpZ25lZCBHcmlldmFuY2VzCiAgICBPZmZpY2VyLT4+QVBJOiA4LiBSZXNvbHZlL0FjdGlvbiBHcmlldmFuY2UKICAgIEFQSS0+PkRCOiA5LiBVcGRhdGUgU3RhdHVzOiBSRVNPTFZFRCArIExvZyBIaXN0b3J5CiAgICBDaXRpemVuLT4+QVBJOiAxMC4gVHJhY2sgU3RhdHVzICYgVmlldyBSZXNvbHV0aW9u)
 
 ---
@@ -103,6 +82,18 @@ sequenceDiagram
 | `/user` | `GET` | Statistics for citizen dashboard |
 | `/officer` | `GET` | Metrics for officer performance |
 | `/admin` | `GET` | System-wide analytics and trends |
+
+---
+
+## 🔄 Recent Updates
+
+### 👤 Citizen Registration Page
+- **Functional Register Screen**: Implemented a standalone [RegisterPage](file:///d:/First/Project/Smart-Grievance-System/Frontend/src/pages/RegisterPage.jsx) featuring validation logic (10-digit phone verification, minimum password length, matching confirmation, and validation indicators) linked to the backend registration API.
+- **Frictionless Onboarding**: Configured routers to automatically log in the citizen and redirect them to their dashboard upon successful registration.
+
+### 📝 Grievance Description UI Cleanup
+- **Simplified Terminology**: Replaced all mentions of "Core Narrative" with **"Description"** to improve clarity for users.
+- **Minimalist Aesthetic**: Cleaned up the input terminal component ([CoreNarrative](file:///d:/First/Project/Smart-Grievance-System/Frontend/src/components/CoreNarrative.jsx)) by removing debug status logs (`SYSTEM STATUS: IDLE` / `SYSTEM STATUS: PARSING...`), providing a focused, premium workspace.
 
 ---
 
