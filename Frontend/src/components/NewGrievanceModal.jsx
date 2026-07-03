@@ -58,7 +58,7 @@ const NewGrievanceModal = ({ isOpen, onClose, onSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.description || !formData.description.trim()) {
-      alert("The Core Narrative operational log cannot be empty.");
+      alert("The description cannot be empty.");
       return;
     }
     setLoading(true);
@@ -205,7 +205,7 @@ const NewGrievanceModal = ({ isOpen, onClose, onSuccess }) => {
 
               {/* Description (CoreNarrative Terminal) */}
               <div className="space-y-2.5">
-                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">Core Narrative</Label>
+                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">Description</Label>
                 <CoreNarrative 
                   value={formData.description}
                   onChange={(text) => setFormData({...formData, description: text})}

@@ -72,7 +72,7 @@ export default function CoreNarrative({ value, onChange, placeholder }) {
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-300">
             <Terminal className="w-4 h-4 text-primary" />
-            <span>Core Narrative Log</span>
+            <span>Description</span>
           </div>
           {value && (
             <button
@@ -133,22 +133,7 @@ export default function CoreNarrative({ value, onChange, placeholder }) {
       </div>
 
       {/* Footer Bar */}
-      <div className="flex items-center justify-between px-5 py-3 border-t border-border/10 bg-card/25 text-[10px] font-black tracking-widest uppercase">
-        {/* Left Side: System Parsing Status */}
-        <div className="flex items-center gap-2">
-          {isTyping ? (
-            <>
-              <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
-              <span className="text-amber-400 animate-pulse drop-shadow-[0_0_8px_rgba(251,191,36,0.6)] font-bold">SYSTEM STATUS: PARSING...</span>
-            </>
-          ) : (
-            <>
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-              <span className="text-emerald-400 font-bold drop-shadow-[0_0_6px_rgba(52,211,153,0.4)]">SYSTEM STATUS: IDLE</span>
-            </>
-          )}
-        </div>
-
+      <div className="flex items-center justify-end px-5 py-3 border-t border-border/10 bg-card/25 text-[10px] font-black tracking-widest uppercase">
         {/* Right Side: Character Counter */}
         <div className="flex items-center gap-1.5">
           <span className={`transition-colors duration-300 ${
