@@ -250,26 +250,26 @@ The repository is divided cleanly into a Java Spring Boot backend project (maven
 
 ```
 smart-grievance-system/
-├── Backend/                              # Spring Boot Backend application
-│   ├── pom.xml                           # Maven dependency configurations
-│   ├── src/main/java/com/grievance/       # Backend Java Core
-│   │   ├── SmartGrievanceApplication.java # Main Entry Point
-│   │   ├── config/                       # Bean configuration classes (CORS, AppConfig)
-│   │   ├── controller/                   # REST Controller Endpoints
-│   │   ├── dto/                          # Data Transfer Objects
-│   │   │   ├── request/                  # Payloads accepted by APIs
-│   │   │   └── response/                 # Unified structures returned by APIs
-│   │   ├── entity/                       # JPA Hibernate mapping models
-│   │   ├── enums/                        # Shared enums (Role, Priority, GrievanceStatus)
-│   │   ├── exception/                    # Custom errors & global exception handler
-│   │   ├── repository/                   # Database interfaces (Spring Data JPA)
-│   │   ├── security/                     # JWT filters, Config, & CustomUserDetailsService
-│   │   ├── service/                      # Transactional Business Logic implementations
-│   │   └── util/                         # Helper classes (File storage, Audit utilities)
-│   └── src/main/resources/
-│       ├── application.properties        # Core environment configuration profile
-│       ├── db/schema.sql                 # Complete MySQL setup schema and seed values
-│       └── templates/                    # Email template documents (HTML layout)
+├── pom.xml                               # Maven dependency configurations
+├── src/main/java/com/grievance/           # Backend Java Core
+│   ├── SmartGrievanceApplication.java    # Main Entry Point
+│   ├── config/                           # Bean configuration classes (CORS, AppConfig)
+│   ├── controller/                       # REST Controller Endpoints
+│   ├── dto/                              # Data Transfer Objects
+│   │   ├── request/                      # Payloads accepted by APIs
+│   │   └── response/                     # Unified structures returned by APIs
+│   ├── entity/                           # JPA Hibernate mapping models
+│   ├── enums/                            # Shared enums (Role, Priority, GrievanceStatus)
+│   ├── exception/                        # Custom errors & global exception handler
+│   ├── repository/                       # Database interfaces (Spring Data JPA)
+│   ├── security/                         # JWT filters, Config, & CustomUserDetailsService
+│   ├── service/                          # Transactional Business Logic implementations
+│   └── util/                             # Helper classes (File storage, Audit utilities)
+│
+├── src/main/resources/
+│   ├── application.properties            # Core environment configuration profile
+│   ├── db/schema.sql                     # Complete MySQL setup schema and seed values
+│   └── templates/                        # Email template documents (HTML layout)
 │
 └── Frontend/                             # React + Vite Client Application
     ├── package.json                      # NPM configuration and script handles
@@ -315,12 +315,12 @@ Follow this guide to get both the backend and frontend up and running locally.
    ```
 2. The system is configured to auto-update tables (`spring.jpa.hibernate.ddl-auto=update`). If starting fresh, run the schema file to pre-populate database structures and load seed records (departments and default admin credentials):
    ```bash
-    # Execute inside MySQL shell / tool:
-    SOURCE Backend/src/main/resources/db/schema.sql;
-    ```
+   # Execute inside MySQL shell / tool:
+   SOURCE src/main/resources/db/schema.sql;
+   ```
 
 ### Step 2: Backend Configuration
-Open `Backend/src/main/resources/application.properties` and verify your MySQL connection details:
+Open `src/main/resources/application.properties` and verify your MySQL connection details:
 ```properties
 spring.datasource.username=root
 spring.datasource.password=your_database_password
@@ -334,10 +334,8 @@ spring.mail.password=your-app-specific-password
 ```
 
 ### Step 3: Run the Backend
-Navigate to the `Backend` directory and run the backend using the Maven Wrapper:
+Run the backend using the Maven Wrapper:
 ```bash
-cd Backend
-
 # Windows Command Prompt / PowerShell
 ./mvnw.cmd spring-boot:run
 

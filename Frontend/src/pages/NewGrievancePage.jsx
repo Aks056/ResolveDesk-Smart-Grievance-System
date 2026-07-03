@@ -68,7 +68,7 @@ const NewGrievancePage = () => {
       setModal({
         isOpen: true,
         title: "Validation Error",
-        description: "The Core Narrative operational log cannot be empty.",
+        description: "The description cannot be empty.",
         type: "error"
       });
       return;
@@ -156,7 +156,7 @@ const NewGrievancePage = () => {
           <div className="my-auto space-y-8 animate-in slide-in-from-left-8 fade-in duration-1000">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary w-max shadow-[0_0_15px_rgba(182,160,255,0.2)]">
               <Activity className="w-4 h-4 animate-pulse" />
-              <span className="text-[10px] font-black uppercase tracking-[0.2em]">Live Secure Node</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.2em]">Submit a Request</span>
             </div>
 
             <div className="space-y-4">
@@ -167,7 +167,7 @@ const NewGrievancePage = () => {
                 </span>
               </h1>
               <p className="text-base text-muted-foreground leading-relaxed max-w-md font-medium">
-                Log your operational grievance directly into our secure campus resolution grid. Provide specific details, attach evidence, and dispatch it to the responsible department for immediate triaging.
+                Please provide the details of your issue below. Your complaint will be routed to the respective department for quick resolution.
               </p>
             </div>
 
@@ -175,14 +175,14 @@ const NewGrievancePage = () => {
               <div className="p-4 rounded-2xl bg-secondary/5 border border-secondary/10 flex flex-col gap-2 backdrop-blur-md">
                 <ShieldCheck className="w-6 h-6 text-secondary drop-shadow-[0_0_8px_rgba(0,212,236,0.6)]" />
                 <div className="space-y-0.5">
-                  <h4 className="font-bold text-xs text-foreground">Encrypted Pipeline</h4>
+                  <h4 className="font-bold text-xs text-foreground">Secure Submission</h4>
                   <p className="text-[10px] text-muted-foreground leading-snug">End-to-end trace protection</p>
                 </div>
               </div>
               <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 flex flex-col gap-2 backdrop-blur-md">
                 <Zap className="w-6 h-6 text-primary drop-shadow-[0_0_8px_rgba(182,160,255,0.6)]" />
                 <div className="space-y-0.5">
-                  <h4 className="font-bold text-xs text-foreground">Rapid Triaging</h4>
+                  <h4 className="font-bold text-xs text-foreground">Fast Resolution</h4>
                   <p className="text-[10px] text-muted-foreground leading-snug">Automated priority routing</p>
                 </div>
               </div>
@@ -213,7 +213,7 @@ const NewGrievancePage = () => {
                   <div className="space-y-3 group">
                     <Label htmlFor="title" className="text-xs font-black uppercase tracking-widest text-muted-foreground group-focus-within:text-foreground transition-colors flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(182,160,255,0.8)] transition-all" />
-                      Subject Matter
+                      Subject 
                     </Label>
                     <Input
                       id="title"
@@ -231,7 +231,7 @@ const NewGrievancePage = () => {
                     <div className="space-y-3 group">
                       <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground group-focus-within:text-foreground transition-colors flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-secondary shadow-[0_0_8px_rgba(0,212,236,0.8)] transition-all" />
-                        Target Protocol
+                        Department
                       </Label>
                       <Select onValueChange={(val) => setFormData({ ...formData, departmentId: val })} required>
                         <SelectTrigger className="h-14 border-border/30 bg-background/50 hover:bg-background focus:ring-secondary/20 focus:border-secondary transition-all rounded-2xl font-semibold shadow-inner">
@@ -251,7 +251,7 @@ const NewGrievancePage = () => {
                     <div className="space-y-3 group">
                       <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground group-focus-within:text-foreground transition-colors flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(182,160,255,0.8)] transition-all" />
-                        Urgency Level
+                        Priority
                       </Label>
                       <Select onValueChange={(val) => setFormData({ ...formData, priority: val })} required>
                         <SelectTrigger className="h-14 border-border/30 bg-background/50 hover:bg-background focus:ring-primary/20 focus:border-primary transition-all rounded-2xl font-semibold shadow-inner">
@@ -275,10 +275,9 @@ const NewGrievancePage = () => {
                   <div className="space-y-3">
                     <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-secondary shadow-[0_0_8px_rgba(0,212,236,0.8)] transition-all" />
-                      Core Narrative
+                      Description
                     </Label>
-                    <CoreNarrative
-                      value={formData.description}
+                    <CoreNarrative                      value={formData.description}
                       onChange={(text) => setFormData({ ...formData, description: text })}
                       placeholder="Provide a comprehensive operational log. Include specific locations, dates, and the immediate impact to expedite routing..."
                     />
@@ -289,7 +288,7 @@ const NewGrievancePage = () => {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(182,160,255,0.8)] transition-all" />
-                        Attach Evidence
+                        Supporting Documents
                       </Label>
                       
                       {/* Glassmorphic Tab Switcher */}
@@ -303,7 +302,7 @@ const NewGrievancePage = () => {
                               : 'text-muted-foreground/60 hover:text-foreground'
                           }`}
                         >
-                          Local Upload
+                          Upload File
                         </button>
                         <button
                           type="button"
@@ -314,7 +313,7 @@ const NewGrievancePage = () => {
                               : 'text-muted-foreground/60 hover:text-foreground'
                           }`}
                         >
-                          Cloud Link
+                          Paste Link
                         </button>
                       </div>
                     </div>
