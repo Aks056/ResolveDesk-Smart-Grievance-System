@@ -14,7 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { 
   LayoutDashboard, Clock, CheckCircle2, AlertCircle, FileText, Plus, Bell, MoreHorizontal,
   TrendingUp, TrendingDown, Layers, Building2, Ticket, ArrowRight, UserPlus, Search, Ghost,
-  AlertTriangle, X, UserCheck, ArrowUp, ArrowDown, ArrowUpDown
+  AlertTriangle, X, UserCheck, ArrowUp, ArrowDown, ArrowUpDown, ThumbsUp
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -220,6 +220,43 @@ const DashboardPage = () => {
   };
 
   // Action Handlers from Table
+  const handleToggleUpvote = async (grievanceId) => {
+    const grievance = recentGrievances.find(g => g.id === grievanceId);
+    if (!grievance) return;
+
+    const previouslyUpvoted = grievance.hasUpvoted || false;
+    const previousCount = grievance.upvoteCount || 0;
+
+    const nextUpvoted = !previouslyUpvoted;
+    const nextCount = previouslyUpvoted ? Math.max(0, previousCount - 1) : previousCount + 1;
+
+    const updateGrievanceState = (list) => 
+      list.map(g => g.id === grievanceId ? { ...g, hasUpvoted: nextUpvoted, upvoteCount: nextCount } : g);
+
+    setRecentGrievances(prev => updateGrievanceState(prev));
+    setAllGrievances(prev => updateGrievanceState(prev));
+
+    try {
+      const response = await api.post(`/grievances/${grievanceId}/upvote`);
+      const serverGrievance = response.data;
+      const updateFromServer = (list) =>
+        list.map(g => g.id === grievanceId ? { 
+          ...g, 
+          hasUpvoted: serverGrievance.hasUpvoted, 
+          upvoteCount: serverGrievance.upvoteCount 
+        } : g);
+      setRecentGrievances(prev => updateFromServer(prev));
+      setAllGrievances(prev => updateFromServer(prev));
+    } catch (err) {
+      console.error("Failed to toggle upvote", err);
+      toast.error("Failed to update upvote. Please try again.");
+      const revertGrievanceState = (list) =>
+        list.map(g => g.id === grievanceId ? { ...g, hasUpvoted: previouslyUpvoted, upvoteCount: previousCount } : g);
+      setRecentGrievances(prev => revertGrievanceState(prev));
+      setAllGrievances(prev => revertGrievanceState(prev));
+    }
+  };
+
   const handleDeleteGrievanceFromTable = async (grievanceId) => {
     if (window.confirm(`Are you sure you want to delete ticket #GRV-${String(grievanceId).padStart(4, '0')}?`)) {
       try {
@@ -430,8 +467,8 @@ const DashboardPage = () => {
               Welcome back, {user?.firstName || 'User'}!
             </h2>
             <p className="text-muted-foreground/80 max-w-lg text-sm font-medium">
-              Your personalized grievance dashboard is synchronized. 
-              You have <span className="text-foreground font-bold">{(stats?.pendingGrievances || 0) + (stats?.inProgressGrievances || 0)} active tickets</span> requiring attention.
+              Your personalized grievance dashboard is up to date. 
+              You have <span className="text-foreground font-bold">{(stats?.pendingGrievances || 0) + (stats?.inProgressGrievances || 0)}pending grievances</span> requiring attention.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -491,7 +528,7 @@ const DashboardPage = () => {
                   </div>
                 )}
               </div>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">SLA breached (&gt;48h)</p>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Overdue (&gt;48h)</p>
             </CardContent>
           </Card>
 
@@ -721,6 +758,7 @@ const DashboardPage = () => {
                           Priority {getSortIcon('priority')}
                         </div>
                       </TableHead>
+                      <TableHead className="text-center">Upvotes</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead 
                         className="text-right cursor-pointer select-none hover:bg-muted/30 transition-colors"
@@ -764,6 +802,22 @@ const DashboardPage = () => {
                           </div>
                         </TableCell>
                         <TableCell>{getPriorityBadge(g.priority)}</TableCell>
+                        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "h-8 px-2.5 gap-1.5 rounded-lg font-bold text-xs transition-all duration-300",
+                              g.hasUpvoted 
+                                ? "text-primary bg-primary/10 hover:bg-primary/20 shadow-sm"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                            )}
+                            onClick={() => handleToggleUpvote(g.id)}
+                          >
+                            <ThumbsUp className={cn("h-3.5 w-3.5", g.hasUpvoted && "fill-current")} />
+                            <span>{g.upvoteCount || 0}</span>
+                          </Button>
+                        </TableCell>
                         <TableCell>{getStatusBadge(g.status)}</TableCell>
                         <TableCell className="text-right text-muted-foreground text-xs font-medium">
                           {parseDate(g.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}

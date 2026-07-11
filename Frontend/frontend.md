@@ -118,7 +118,7 @@ All API calls are routed through a central Axios instance in `lib/api.js`.
 | Method | Endpoint | Description | Usage |
 | :--- | :--- | :--- | :--- |
 | `POST` | `/auth/login` | User authentication | `LoginPage` |
-| `GET` | `/grievances/all` | Fetch all grievances (Admin) | `RecentGrievancesPage` |
+| `GET` | `/grievances/all` | Fetch all grievances (Admin / User global feed) | `RecentGrievancesPage` |
 | `GET` | `/grievances/my` | Fetch citizen's grievances | `MyGrievancesPage` |
 | `GET` | `/grievances/recent` | Fetch most recent grievances | `DashboardPage` |
 | `GET` | `/grievances/departments` | Fetch available departments | `NewGrievancePage` |
@@ -126,10 +126,16 @@ All API calls are routed through a central Axios instance in `lib/api.js`.
 | `GET` | `/grievances/{id}` | Fetch grievance details | `GrievanceDetailsPage` |
 | `GET` | `/grievances/{id}/history` | Fetch grievance status history | `GrievanceDetailsPage` |
 | `PUT` | `/grievances/{id}/close` | Close/Archive a grievance | `GrievanceDetailsPage` |
+| `POST` | `/grievances/{id}/upvote` | Toggle upvote for a grievance | `DashboardPage`, `RecentGrievancesPage` |
+| `POST` | `/feedback` | Submit feedback for resolved grievance | `GrievanceDetailsPage` |
+| `GET` | `/feedback/grievance/{id}`| Fetch feedback for a specific grievance | `GrievanceDetailsPage` |
 | `GET` | `/dashboard/{role}` | Fetch role-specific statistics | `DashboardPage` |
 | `GET` | `/user/profile` | Fetch user profile data | `ProfilePage` |
 | `PUT` | `/user/profile` | Update user profile data | `ProfilePage` |
 | `PUT` | `/user/change-password` | Update account password | `ProfilePage` |
+
+### 🛠️ Client-Side Protected Routes & Views
+- `/privacy-policy` -> Accessible via Layout Footer link. Renders `PrivacyPolicyPage.jsx`.
 
 ---
 

@@ -30,6 +30,8 @@ import com.grievance.repository.FeedbackRepository;
 import com.grievance.repository.GrievanceHistoryRepository;
 import com.grievance.repository.GrievanceRepository;
 import com.grievance.repository.UserRepository;
+import com.grievance.entity.GrievanceUpvote;
+import com.grievance.repository.GrievanceUpvoteRepository;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,6 +50,7 @@ public class GrievanceService {
     private EmailService emailService;
     private FileStorageService fileStorageService;
     private ModelMapper modelMapper;
+    private GrievanceUpvoteRepository upvoteRepository;
 
     public GrievanceResponse submitGrievance(Long userId, String title, String description, 
             Long departmentId, Priority priority, MultipartFile file) {
@@ -288,7 +291,58 @@ public class GrievanceService {
         response.setImageUrl("/" + grievance.getAttachmentUrl());
     }
 
+    // Upvote data
+    int upvoteCount = upvoteRepository.countByGrievanceId(grievance.getId());
+    response.setUpvoteCount(upvoteCount);
+    
+    Long currentUserId = getCurrentUserId();
+    if (currentUserId != null) {
+        response.setHasUpvoted(upvoteRepository.existsByGrievanceIdAndUserId(grievance.getId(), currentUserId));
+    } else {
+        response.setHasUpvoted(false);
+    }
+
     return response;
+}
+
+private Long getCurrentUserId() {
+    try {
+        org.springframework.security.core.Authentication authentication = 
+            org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof com.grievance.security.CustomUserDetails) {
+            return ((com.grievance.security.CustomUserDetails) authentication.getPrincipal()).getUserId();
+        }
+    } catch (Exception e) {
+        log.error("Error retrieving user from SecurityContext", e);
+    }
+    return null;
+}
+
+public GrievanceResponse toggleUpvote(Long grievanceId, Long userId) {
+    log.info("Toggling upvote on grievance ID: {} for user ID: {}", grievanceId, userId);
+    
+    Grievance grievance = grievanceRepository.findById(grievanceId)
+            .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
+            
+    User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+            
+    java.util.Optional<GrievanceUpvote> existingUpvote = 
+            upvoteRepository.findByGrievanceIdAndUserId(grievanceId, userId);
+            
+    if (existingUpvote.isPresent()) {
+        upvoteRepository.delete(existingUpvote.get());
+        log.info("Removed upvote for grievance {} by user {}", grievanceId, userId);
+    } else {
+        GrievanceUpvote upvote = GrievanceUpvote.builder()
+                .grievance(grievance)
+                .user(user)
+                .build();
+        upvoteRepository.save(upvote);
+        log.info("Added upvote for grievance {} by user {}", grievanceId, userId);
+    }
+    
+    return convertToResponse(grievance);
 }
 public void closeByUser(Long grievanceId, Long userId, String remarks) {
     Grievance grievance = grievanceRepository.findById(grievanceId)

@@ -76,6 +76,7 @@ The backend follows a standard **N-Tier Architecture**:
 | `/api/grievances/{id}/accept`| `PUT` | (Officer) Accept a pending grievance assigned to them. | ID in Path |
 | `/api/grievances/{id}/close` | `PUT` | (User) Close a grievance submitted by the current user. | ID in Path |
 | `/api/grievances/{id}/history`| `GET` | View the timeline of events for a grievance. | ID in Path |
+| `/api/grievances/{id}/upvote` | `POST`| Toggle user upvote for a grievance. | Auth Token |
 | `/api/grievances/{id}` | `DELETE` | (Admin) Delete a grievance record. | ID in Path |
 
 ### 3.4 Dashboard & Statistics (`/api/dashboard`)
@@ -89,14 +90,14 @@ The backend follows a standard **N-Tier Architecture**:
 | `/api/dashboard/statistics`| `GET` | Detailed breakdown of grievances by status/types. | JSON Map |
 
 ### 3.5 Feedback Management (`/api/feedback`)
-*Post-resolution feedback and rating.*
+*Post-resolution feedback and rating. The authenticated user ID is retrieved dynamically from the JWT security token.*
 
-| Endpoint | Method | Description | Request Data |
+| Endpoint | Method | Description | Request/Response Data |
 | :--- | :--- | :--- | :--- |
-| `/api/feedback` | `POST` | Submit feedback for a resolved grievance. | `FeedbackRequest` |
-| `/api/feedback/grievance/{id}`| `GET` | Get all feedback related to a specific grievance. | ID in Path |
-| `/api/feedback/my` | `GET` | List all feedback submitted by the current user. | Auth Token |
-| `/api/feedback/grievance/{id}/rating`| `GET` | Get average rating for a specific grievance. | ID in Path |
+| `/api/feedback` | `POST` | Submit feedback for a resolved grievance. | `FeedbackRequest` -> Returns `FeedbackResponse` |
+| `/api/feedback/grievance/{id}`| `GET` | Get all feedback related to a specific grievance. | ID in Path -> Returns `List<FeedbackResponse>` |
+| `/api/feedback/my` | `GET` | List all feedback submitted by the current user. | Auth Token -> Returns `List<FeedbackResponse>` |
+| `/api/feedback/grievance/{id}/rating`| `GET` | Get average rating for a specific grievance. | ID in Path -> Returns `Double` |
 | `/api/feedback/{id}` | `DELETE` | (User) Delete their own feedback. | ID in Path |
 
 ### 3.6 Administrative User Operations (`/api/user` and `/api/admin`)
@@ -134,6 +135,7 @@ The backend follows a standard **N-Tier Architecture**:
 ```json
 {
   "id": 101,
+  "grievanceNumber": "GRV-0101",
   "title": "Wi-Fi Issue in Library",
   "status": "PENDING",
   "priority": "HIGH",
@@ -141,7 +143,22 @@ The backend follows a standard **N-Tier Architecture**:
   "departmentName": "IT Services",
   "citizenName": "Ayush Singh",
   "averageRating": 4.5,
-  "imageUrl": "/uploads/grievance_101.png"
+  "imageUrl": "/uploads/grievance_101.png",
+  "upvoteCount": 3,
+  "hasUpvoted": true
+}
+```
+
+### `FeedbackResponse` (GET)
+```json
+{
+  "id": 10,
+  "grievanceId": 101,
+  "userId": 2,
+  "userName": "Ayush Singh",
+  "rating": 5,
+  "comments": "The IT team resolved the issue in under 2 hours. Extremely satisfied!",
+  "createdAt": "2026-04-01T14:20:00Z"
 }
 ```
 

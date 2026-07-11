@@ -42,4 +42,6 @@ public class GrievanceResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Double averageRating;
+    private Integer upvoteCount;
+    private Boolean hasUpvoted;
 }

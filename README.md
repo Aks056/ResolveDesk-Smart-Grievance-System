@@ -24,6 +24,8 @@ The project follows a **Decoupled Architecture** with a clear separation between
 - **Instant Registration**: Secure signup with email verification.
 - **Dimensional Dashboard**: Premium, centralized portal detailing recent grievances, personalized metrics, and global feeds.
 - **Smart Submission**: Submit grievances with titles, categorized departments, priority levels, and file attachments (images).
+- **Grievance Upvoting**: Citizens can upvote public grievances from the dashboard and global feed to boost visibility and prioritize issues.
+- **Resolution Feedback**: Post-resolution rating (1-5 stars) and comments to assess redressal quality.
 - **Profile Management**: Manage account details and security credentials natively.
 - **Real-time Tracking**: Monitor grievance status from 'Pending' to 'Resolved'.
 
@@ -44,6 +46,7 @@ The project follows a **Decoupled Architecture** with a clear separation between
 - **Stitch Design System**: Beautiful and premium "Dimensional Interface" utilizing responsive React components.
 - **Aesthetic**: Deep Aether Purple and Prism Cyan color scheme with crisp glassmorphism, dynamic layouts, and modern typography.
 - **Global Feed**: Chronological display of recent anonymous and public grievances across the entire platform.
+- **Privacy Policy**: A dedicated policy screen detailing institutional security protocols and data handling.
 
 ---
 
@@ -70,11 +73,25 @@ The project follows a **Decoupled Architecture** with a clear separation between
 | :--- | :--- | :--- |
 | `/` | `POST` | Submit a new grievance (Multipart) |
 | `/my` | `GET` | List grievances for the logged-in user |
-| `/recent` | `GET` | Get top 3 latest pending grievances |
+| `/recent` | `GET` | Fetch top 5 recent grievances for user/officer/admin dashboard |
+| `/all` | `GET` | Global Feed: List all grievances (anonymized for users) |
 | `/{id}` | `GET` | Get detailed grievance information |
 | `/assigned` | `GET` | List grievances assigned to the officer |
-| `/{id}/status`| `PUT` | Update status and add remarks |
+| `/{id}/status`| `PUT` | Update status and add remarks (Officer/Admin Only) |
+| `/{id}/accept`| `PUT` | Accept a pending assigned grievance (Officer Only) |
+| `/{id}/close` | `PUT` | Close a grievance (User Only) |
+| `/{id}/history`| `GET`| Get timeline log of grievance changes |
+| `/{id}/upvote`| `POST`| Toggle user upvote for a grievance |
 | `/{id}` | `DELETE`| Remove a grievance (Admin Only) |
+
+### 💬 Feedback (`/api/feedback`)
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/` | `POST` | Submit feedback for a resolved grievance (User Only) |
+| `/grievance/{id}` | `GET` | Get all feedback related to a specific grievance |
+| `/my` | `GET` | List all feedback submitted by the current user (User Only) |
+| `/grievance/{id}/rating`| `GET` | Get average rating for a specific grievance |
+| `/{id}` | `DELETE`| Remove user's own feedback (User Only) |
 
 ### 📊 Dashboards (`/api/dashboard`)
 | Endpoint | Method | Description |

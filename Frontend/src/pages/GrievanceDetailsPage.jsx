@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { 
   ArrowLeft, Building2, Clock, CheckCircle2, AlertCircle, Calendar, 
   User, MessageSquare, Image as ImageIcon, History, XCircle, MoreVertical,
-  ExternalLink, Download, ShieldCheck
+  ExternalLink, Download, ShieldCheck, Star
 } from "lucide-react";
 import ConfirmDialog from '../components/ConfirmDialog';
 import { cn } from "@/lib/utils";
@@ -38,6 +38,13 @@ const GrievanceDetailsPage = () => {
   const [localOfficerId, setLocalOfficerId] = useState("");
   const [isInternal, setIsInternal] = useState(true);
 
+  // Feedback states
+  const [feedback, setFeedback] = useState(null);
+  const [loadingFeedback, setLoadingFeedback] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackComments, setFeedbackComments] = useState("");
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+
   useEffect(() => {
     if (grievance) {
       setLocalPriority(grievance.priority);
@@ -45,32 +52,52 @@ const GrievanceDetailsPage = () => {
     }
   }, [grievance]);
 
-  useEffect(() => {
-    const fetchDetails = async () => {
-      try {
-        setLoading(true);
-        window.scrollTo(0, 0); // Reset scroll position to top
-        const [detailsRes, historyRes] = await Promise.all([
-          api.get(`/grievances/${id}`),
-          api.get(`/grievances/${id}/history`)
-        ]);
-        setGrievance(detailsRes.data);
-        setHistory(historyRes.data || []);
+  const fetchDetails = async () => {
+    try {
+      setLoading(true);
+      window.scrollTo(0, 0); // Reset scroll position to top
+      const [detailsRes, historyRes] = await Promise.all([
+        api.get(`/grievances/${id}`),
+        api.get(`/grievances/${id}/history`)
+      ]);
+      setGrievance(detailsRes.data);
+      setHistory(historyRes.data || []);
 
-        if (user?.role === 'ADMIN' || user?.role === 'OFFICER') {
-          try {
-            const officersRes = await api.get('/grievances/officers');
-            setOfficers(officersRes.data || []);
-          } catch (err) {
-            console.error("Failed to fetch officers", err);
+      if (detailsRes.data.status === 'RESOLVED' || detailsRes.data.status === 'CLOSED_BY_USER') {
+        try {
+          setLoadingFeedback(true);
+          const feedbackRes = await api.get(`/feedback/grievance/${id}`);
+          if (feedbackRes.data && feedbackRes.data.length > 0) {
+            setFeedback(feedbackRes.data[0]);
+          } else {
+            setFeedback(null);
           }
+        } catch (err) {
+          console.error("Failed to fetch feedback", err);
+          setFeedback(null);
+        } finally {
+          setLoadingFeedback(false);
         }
-      } catch (err) {
-        console.error("Failed to fetch grievance details", err);
-      } finally {
-        setLoading(false);
+      } else {
+        setFeedback(null);
       }
-    };
+
+      if (user?.role === 'ADMIN' || user?.role === 'OFFICER') {
+        try {
+          const officersRes = await api.get('/grievances/officers');
+          setOfficers(officersRes.data || []);
+        } catch (err) {
+          console.error("Failed to fetch officers", err);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch grievance details", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchDetails();
   }, [id, user]);
 
@@ -123,6 +150,29 @@ const GrievanceDetailsPage = () => {
       });
     } finally {
       setClosing(false);
+    }
+  };
+
+  const handleSubmitFeedback = async (e) => {
+    e.preventDefault();
+    if (feedbackRating < 1 || feedbackRating > 5) {
+      toast.error("Please select a rating between 1 and 5 stars.");
+      return;
+    }
+    try {
+      setSubmittingFeedback(true);
+      const res = await api.post('/feedback', {
+        grievanceId: parseInt(id),
+        rating: feedbackRating,
+        comments: feedbackComments.trim()
+      });
+      toast.success("Feedback submitted successfully. Thank you!");
+      setFeedback(res.data);
+    } catch (err) {
+      console.error("Failed to submit feedback", err);
+      toast.error(err.response?.data?.message || "Failed to submit feedback");
+    } finally {
+      setSubmittingFeedback(false);
     }
   };
 
@@ -399,6 +449,115 @@ const GrievanceDetailsPage = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* Feedback & Ratings Section */}
+            {(grievance.status === 'RESOLVED' || grievance.status === 'CLOSED_BY_USER') && (
+              <Card className="border-none shadow-sm ring-1 ring-border overflow-hidden bg-card/40 backdrop-blur-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-indigo-500" />
+                    Resolution Feedback
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {loadingFeedback ? (
+                    <div className="py-4 text-center text-xs font-bold text-muted-foreground animate-pulse">
+                      Retrieving feedback data...
+                    </div>
+                  ) : feedback ? (
+                    // Read-only Feedback Card
+                    <div className="p-5 rounded-2xl bg-indigo-500/[0.03] border border-indigo-500/10 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-indigo-600/10 flex items-center justify-center">
+                            <User className="h-4 w-4 text-indigo-600" />
+                          </div>
+                          <div className="space-y-0.5">
+                            <p className="text-xs font-bold">{feedback.userName || 'Citizen'}</p>
+                            <p className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wider">
+                              Submitted {new Date(feedback.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={cn(
+                                "h-4 w-4",
+                                star <= feedback.rating
+                                  ? "text-yellow-500 fill-yellow-500"
+                                  : "text-muted-foreground/30"
+                              )}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      {feedback.comments && (
+                        <div className="p-4 rounded-xl bg-background/50 border border-border/20 text-sm leading-relaxed text-slate-300 italic whitespace-pre-wrap font-medium">
+                          "{feedback.comments}"
+                        </div>
+                      )}
+                    </div>
+                  ) : user?.id === grievance.citizenId && grievance.status === 'RESOLVED' ? (
+                    // Interactive Feedback Submission Form
+                    <form onSubmit={handleSubmitFeedback} className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 block">
+                          Rate the Resolution Experience
+                        </label>
+                        <div className="flex items-center gap-2">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setFeedbackRating(star)}
+                              className="focus:outline-none transition-transform active:scale-95 p-1"
+                            >
+                              <Star
+                                className={cn(
+                                  "h-8 w-8 transition-colors duration-200",
+                                  star <= feedbackRating
+                                    ? "text-yellow-500 fill-yellow-500 filter drop-shadow-[0_0_8px_rgba(234,179,8,0.3)]"
+                                    : "text-muted-foreground/40 hover:text-yellow-500/60"
+                                )}
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 block">
+                          Provide Remarks / Review Comments
+                        </label>
+                        <textarea
+                          value={feedbackComments}
+                          onChange={(e) => setFeedbackComments(e.target.value)}
+                          placeholder="Tell us about your experience with the resolution..."
+                          maxLength={1000}
+                          rows={3}
+                          className="w-full rounded-xl border border-border bg-slate-950/60 p-3 font-mono text-sm leading-relaxed text-slate-100 placeholder:text-zinc-500 focus:ring-1 focus:ring-indigo-500/50 focus:outline-none resize-none transition-all"
+                        />
+                        <div className="text-right text-[9px] text-muted-foreground/75 font-semibold">
+                          {feedbackComments.length} / 1000 MAX
+                        </div>
+                      </div>
+                      <Button
+                        type="submit"
+                        disabled={submittingFeedback}
+                        className="w-full h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest text-[10px] rounded-xl shadow-lg shadow-indigo-600/20"
+                      >
+                        {submittingFeedback ? 'Transmitting Feedback...' : 'Submit Resolution Feedback'}
+                      </Button>
+                    </form>
+                  ) : (
+                    <div className="py-4 text-center text-xs font-semibold text-muted-foreground italic">
+                      No feedback submitted yet for this grievance.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Resolution History / Timeline */}
             <div className="space-y-6">
