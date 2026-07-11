@@ -188,6 +188,15 @@ public class GrievanceController {
         return ResponseEntity.ok(grievanceService.getAllOfficers());
     }
 
+    // ================= UPVOTE =================
+    @PostMapping("/{id}/upvote")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> toggleUpvote(@PathVariable Long id, Authentication authentication) {
+        Long userId = getUserId(authentication);
+        GrievanceResponse response = grievanceService.toggleUpvote(id, userId);
+        return ResponseEntity.ok(response);
+    }
+
     // ================= COMMON METHOD =================
     private Long getUserId(Authentication authentication) {
         if (authentication == null || !(authentication.getPrincipal() instanceof CustomUserDetails)) {

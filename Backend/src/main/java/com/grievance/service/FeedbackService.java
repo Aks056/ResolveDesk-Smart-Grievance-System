@@ -1,11 +1,13 @@
 package com.grievance.service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.grievance.dto.request.FeedbackRequest;
+import com.grievance.dto.response.FeedbackResponse;
 import com.grievance.entity.Feedback;
 import com.grievance.entity.Grievance;
 import com.grievance.entity.User;
@@ -28,7 +30,7 @@ public class FeedbackService {
     private GrievanceRepository grievanceRepository;
     private UserRepository userRepository;
 
-    public Feedback submitFeedback(Long userId, FeedbackRequest request) {
+    public FeedbackResponse submitFeedback(Long userId, FeedbackRequest request) {
         log.info("Submitting feedback for grievance: {} by user: {}", request.getGrievanceId(), userId);
 
         User user = userRepository.findById(userId)
@@ -54,23 +56,27 @@ public class FeedbackService {
 
         Feedback saved = feedbackRepository.save(feedback);
         log.info("Feedback submitted for grievance: {}", saved.getId());
-        return saved;
+        return convertToResponse(saved);
     }
 
     @Transactional(readOnly = true)
-    public List<Feedback> getFeedbackByGrievance(Long grievanceId) {
+    public List<FeedbackResponse> getFeedbackByGrievance(Long grievanceId) {
         Grievance grievance = grievanceRepository.findById(grievanceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
 
-        return feedbackRepository.findByGrievanceOrderByCreatedAtDesc(grievance);
+        return feedbackRepository.findByGrievanceOrderByCreatedAtDesc(grievance).stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public List<Feedback> getUserFeedback(Long userId) {
+    public List<FeedbackResponse> getUserFeedback(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
-        return feedbackRepository.findByUserOrderByCreatedAtDesc(user);
+        return feedbackRepository.findByUserOrderByCreatedAtDesc(user).stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -100,5 +106,17 @@ public class FeedbackService {
         }
 
         feedbackRepository.delete(feedback);
+    }
+
+    private FeedbackResponse convertToResponse(Feedback feedback) {
+        return FeedbackResponse.builder()
+                .id(feedback.getId())
+                .grievanceId(feedback.getGrievance().getId())
+                .userId(feedback.getUser().getId())
+                .userName(feedback.getUser().getFullName())
+                .rating(feedback.getRating())
+                .comments(feedback.getComments())
+                .createdAt(feedback.getCreatedAt())
+                .build();
     }
 }

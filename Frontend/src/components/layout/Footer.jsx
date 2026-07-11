@@ -92,14 +92,14 @@ const Footer = () => {
           </FooterSection>
 
           {/* Contact Section */}
-          <FooterSection title="Command Support" defaultOpen={isDesktop}>
+          <FooterSection title="Contact Us" defaultOpen={isDesktop}>
             <ul className="space-y-5">
               <li className="flex items-start gap-4">
                 <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                   <Mail className="w-4 h-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-0.5">Uplink Email</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-0.5">Email ID</p>
                   <p className="text-sm font-bold">support@resolvedesk.edu</p>
                 </div>
               </li>
@@ -108,7 +108,7 @@ const Footer = () => {
                   <Phone className="w-4 h-4 text-secondary" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-0.5">Tactical Comms</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-0.5">Helpline Number</p>
                   <p className="text-sm font-bold">+1-800-CAMPUS-HQ</p>
                 </div>
               </li>
@@ -117,7 +117,7 @@ const Footer = () => {
                   <MapPin className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-0.5">Command Post</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-0.5">Office Address</p>
                   <p className="text-sm font-bold">Central Admin, Wing B-12</p>
                 </div>
               </li>
@@ -134,8 +134,8 @@ const Footer = () => {
             &copy; {currentYear} ResolveDesk Terminal v2.4.0
           </div>
           <div className="flex items-center gap-8">
-            <Link to="#" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 hover:text-primary transition-colors">Privacy Protocol</Link>
-            <Link to="#" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 hover:text-primary transition-colors">Usage Terms</Link>
+            <Link to="/privacy-policy" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 hover:text-primary transition-colors">Privacy Policy</Link>
+            <Link to="#" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 hover:text-primary transition-colors">Terms of Use</Link>
             <Link to="#" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 hover:text-primary transition-colors">Redressal Policy</Link>
           </div>
         </div>

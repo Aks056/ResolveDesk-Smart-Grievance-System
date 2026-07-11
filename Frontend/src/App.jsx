@@ -9,6 +9,7 @@ import ProfilePage from './pages/ProfilePage';
 import MyGrievancesPage from './pages/MyGrievancesPage';
 import RecentGrievancesPage from './pages/RecentGrievancesPage';
 import GrievanceDetailsPage from './pages/GrievanceDetailsPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './components/layout/MainLayout';
 import ScrollToTop from './components/ScrollToTop';
@@ -54,7 +55,8 @@ const App = () => {
             { path: "/recent-grievances", element: <RecentGrievancesPage /> },
             { path: "/grievances/new", element: <NewGrievancePage /> },
             { path: "/grievances/:id", element: <GrievanceDetailsPage /> },
-            { path: "/profile", element: <ProfilePage /> }
+            { path: "/profile", element: <ProfilePage /> },
+            { path: "/privacy-policy", element: <PrivacyPolicyPage /> }
           ]
         },
         {

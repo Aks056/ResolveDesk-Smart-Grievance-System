@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
   Search, ChevronRight, Building2, User2, Zap, Droplets, HeartPulse, GraduationCap, ShieldCheck, Wrench, ArrowUpDown,
-  LayoutGrid, List, TableProperties, UserPlus
+  LayoutGrid, List, TableProperties, UserPlus, ThumbsUp
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -114,6 +114,35 @@ const RecentGrievancesPage = () => {
       toast.error("Failed to assign officer");
     }
   };
+  const handleToggleUpvote = async (grievanceId) => {
+    const grievance = grievances.find(g => g.id === grievanceId);
+    if (!grievance) return;
+
+    const previouslyUpvoted = grievance.hasUpvoted || false;
+    const previousCount = grievance.upvoteCount || 0;
+
+    const nextUpvoted = !previouslyUpvoted;
+    const nextCount = previouslyUpvoted ? Math.max(0, previousCount - 1) : previousCount + 1;
+
+    setGrievances(prev => prev.map(g => 
+      g.id === grievanceId ? { ...g, hasUpvoted: nextUpvoted, upvoteCount: nextCount } : g
+    ));
+
+    try {
+      const response = await api.post(`/grievances/${grievanceId}/upvote`);
+      const serverGrievance = response.data;
+      setGrievances(prev => prev.map(g => 
+        g.id === grievanceId ? { ...g, hasUpvoted: serverGrievance.hasUpvoted, upvoteCount: serverGrievance.upvoteCount } : g
+      ));
+    } catch (err) {
+      console.error("Failed to toggle upvote", err);
+      toast.error("Failed to update upvote. Please try again.");
+      setGrievances(prev => prev.map(g => 
+        g.id === grievanceId ? { ...g, hasUpvoted: previouslyUpvoted, upvoteCount: previousCount } : g
+      ));
+    }
+  };
+
   const uniqueDepartments = useMemo(() => {
     return Array.from(new Set(grievances.map(g => g.departmentName))).filter(Boolean).sort();
   }, [grievances]);
@@ -374,6 +403,7 @@ const RecentGrievancesPage = () => {
                       <TableHead>Subject</TableHead>
                       <TableHead>Department</TableHead>
                       <TableHead>Priority</TableHead>
+                      <TableHead className="text-center">Upvotes</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right pr-6">Actions</TableHead>
                     </TableRow>
@@ -402,6 +432,22 @@ const RecentGrievancesPage = () => {
                           </div>
                         </TableCell>
                         <TableCell>{getPriorityBadge(g.priority)}</TableCell>
+                        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "h-8 px-2.5 gap-1.5 rounded-lg font-bold text-xs transition-all duration-300",
+                              g.hasUpvoted 
+                                ? "text-primary bg-primary/10 hover:bg-primary/20 shadow-sm"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                            )}
+                            onClick={() => handleToggleUpvote(g.id)}
+                          >
+                            <ThumbsUp className={cn("h-3.5 w-3.5", g.hasUpvoted && "fill-current")} />
+                            <span>{g.upvoteCount || 0}</span>
+                          </Button>
+                        </TableCell>
                         <TableCell>{getStatusBadge(g.status)}</TableCell>
                         <TableCell className="text-right pr-6" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-2">

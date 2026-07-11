@@ -15,7 +15,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.grievance.dto.request.FeedbackRequest;
-import com.grievance.entity.Feedback;
+import com.grievance.dto.response.FeedbackResponse;
+import com.grievance.security.CustomUserDetails;
 import com.grievance.service.FeedbackService;
 
 import jakarta.validation.Valid;
@@ -39,7 +40,7 @@ public class FeedbackController {
 
         try {
             Long userId = getUserIdFromAuthentication(authentication);
-            Feedback feedback = feedbackService.submitFeedback(userId, request);
+            FeedbackResponse feedback = feedbackService.submitFeedback(userId, request);
             return ResponseEntity.status(HttpStatus.CREATED).body(feedback);
         } catch (Exception e) {
             log.error("Error submitting feedback: {}", e.getMessage());
@@ -53,7 +54,7 @@ public class FeedbackController {
         log.debug("Fetching feedback for grievance: {}", grievanceId);
 
         try {
-            List<Feedback> feedbackList = feedbackService.getFeedbackByGrievance(grievanceId);
+            List<FeedbackResponse> feedbackList = feedbackService.getFeedbackByGrievance(grievanceId);
             return ResponseEntity.ok(feedbackList);
         } catch (Exception e) {
             log.error("Error fetching feedback: {}", e.getMessage());
@@ -68,7 +69,7 @@ public class FeedbackController {
 
         try {
             Long userId = getUserIdFromAuthentication(authentication);
-            List<Feedback> feedbackList = feedbackService.getUserFeedback(userId);
+            List<FeedbackResponse> feedbackList = feedbackService.getUserFeedback(userId);
             return ResponseEntity.ok(feedbackList);
         } catch (Exception e) {
             log.error("Error fetching user feedback: {}", e.getMessage());
@@ -108,7 +109,9 @@ public class FeedbackController {
     }
 
     private Long getUserIdFromAuthentication(Authentication authentication) {
-        // In a real scenario, extract user ID from token or principal
-        return 1L;  // Replace with actual implementation
+        if (authentication == null || !(authentication.getPrincipal() instanceof CustomUserDetails)) {
+            throw new RuntimeException("User not authenticated properly");
+        }
+        return ((CustomUserDetails) authentication.getPrincipal()).getUserId();
     }
 }
