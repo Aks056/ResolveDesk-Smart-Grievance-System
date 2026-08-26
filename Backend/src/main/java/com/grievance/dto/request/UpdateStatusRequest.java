@@ -18,6 +18,16 @@ public class UpdateStatusRequest {
     @NotNull(message = "Status is required")
     private GrievanceStatus status;
 
-    @Size(max = 500, message = "Remarks must not exceed 500 characters")
+    @Size(max = 1000, message = "Resolution remarks must not exceed 1000 characters")
+    private String resolutionRemarks;
+
+    @Size(max = 1000, message = "Remarks must not exceed 1000 characters")
     private String remarks;
+
+    public String getEffectiveRemarks() {
+        if (resolutionRemarks != null && !resolutionRemarks.trim().isEmpty()) {
+            return resolutionRemarks.trim();
+        }
+        return remarks != null ? remarks.trim() : "";
+    }
 }

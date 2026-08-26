@@ -31,6 +31,11 @@ public class DashboardResponse {
     // Officer-specific stats
     private long assignedToMe;
     private long resolvedByMe;
+    private long deptUnassignedCount;
+    private long myActiveTasksCount;
+    private long myResolvedCount;
+    private long slaBreachedCount;
+    private String departmentName;
     
     // Admin statistics
     private long totalUsers;

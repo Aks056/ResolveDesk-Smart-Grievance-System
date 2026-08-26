@@ -87,30 +87,41 @@ public class DashboardService {
         User officer = userRepository.findById(officerId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", officerId));
 
-        List<Grievance> assignedGrievances = grievanceRepository.findByAssignedOfficerOrderByCreatedAtDesc(officer);
+        Long deptId = officer.getDepartment() != null ? officer.getDepartment().getId() : null;
+        String deptName = officer.getDepartment() != null ? officer.getDepartment().getName() : "Unassigned";
 
-        long assignedCount = assignedGrievances.size();
-        long resolvedByMe = assignedGrievances.stream()
-                .filter(g -> g.getStatus() == GrievanceStatus.RESOLVED)
-                .count();
+        long deptUnassignedCount = deptId != null ? grievanceRepository.countUnassignedByDepartment(deptId) : 0;
+        long myActiveTasksCount = grievanceRepository.countActiveTasksByOfficer(officerId);
+        long myResolvedCount = grievanceRepository.countResolvedByOfficer(officerId);
 
-        long pendingCount = grievanceRepository.countByStatus(GrievanceStatus.PENDING);
-        long assignedStatusCount = grievanceRepository.countByStatus(GrievanceStatus.ASSIGNED);
-        long inProgressCount = grievanceRepository.countByStatus(GrievanceStatus.IN_PROGRESS);
-        long resolvedCount = grievanceRepository.countByStatus(GrievanceStatus.RESOLVED);
-        long rejectedCount = grievanceRepository.countByStatus(GrievanceStatus.REJECTED);
-        long closedCount = grievanceRepository.countByStatus(GrievanceStatus.CLOSED_BY_USER);
+        // SLA calculation for active tickets in officer's department
+        long slaBreachedCount = 0;
+        if (deptId != null) {
+            List<Grievance> deptGrievances = grievanceRepository.findByDepartment_IdOrderByCreatedAtDesc(deptId);
+            slaBreachedCount = deptGrievances.stream()
+                    .filter(g -> g.getStatus() != GrievanceStatus.RESOLVED
+                              && g.getStatus() != GrievanceStatus.REJECTED
+                              && g.getStatus() != GrievanceStatus.CLOSED_BY_USER)
+                    .filter(g -> {
+                        int days = g.getResolutionDays() != null ? g.getResolutionDays()
+                                : (g.getPriority() != null ? g.getPriority().getResolutionDays() : 3);
+                        return g.getCreatedAt().plusDays(days).isBefore(LocalDateTime.now());
+                    })
+                    .count();
+        }
 
         return DashboardResponse.builder()
+                .deptUnassignedCount(deptUnassignedCount)
+                .myActiveTasksCount(myActiveTasksCount)
+                .myResolvedCount(myResolvedCount)
+                .slaBreachedCount(slaBreachedCount)
+                .assignedToMe(myActiveTasksCount + myResolvedCount)
+                .resolvedByMe(myResolvedCount)
+                .pendingGrievances(deptUnassignedCount)
+                .inProgressGrievances(myActiveTasksCount)
+                .resolvedGrievances(myResolvedCount)
+                .departmentName(deptName)
                 .totalGrievances(grievanceRepository.count())
-                .assignedToMe(assignedCount)
-                .resolvedByMe(resolvedByMe)
-                .pendingGrievances(pendingCount)
-                .assignedGrievances(assignedStatusCount)
-                .inProgressGrievances(inProgressCount)
-                .resolvedGrievances(resolvedCount)
-                .rejectedGrievances(rejectedCount)
-                .closedByUserGrievances(closedCount)
                 .build();
     }
 

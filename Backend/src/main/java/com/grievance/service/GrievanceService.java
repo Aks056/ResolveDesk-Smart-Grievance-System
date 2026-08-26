@@ -143,12 +143,45 @@ public class GrievanceService {
     }
 
     @Transactional(readOnly = true)
-    public List<GrievanceResponse> getAssignedGrievances(Long officerId) {
+    public List<GrievanceResponse> getOfficerDepartmentGrievances(Long officerId, String scope) {
         User officer = userRepository.findById(officerId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", officerId));
-        return grievanceRepository.findByAssignedOfficerOrderByCreatedAtDesc(officer).stream()
+
+        List<Grievance> list;
+        if (officer.getRole() == com.grievance.enums.Role.ADMIN) {
+            if ("MY_TASKS".equalsIgnoreCase(scope)) {
+                list = grievanceRepository.findActiveGrievancesByOfficer(officerId);
+            } else if ("DEPT_POOL".equalsIgnoreCase(scope)) {
+                list = grievanceRepository.findPendingGrievances();
+            } else if ("RESOLVED".equalsIgnoreCase(scope) || "RESOLVED_HISTORY".equalsIgnoreCase(scope)) {
+                list = grievanceRepository.findByStatus(GrievanceStatus.RESOLVED);
+            } else {
+                list = grievanceRepository.findAllByOrderByCreatedAtDesc();
+            }
+        } else {
+            if (officer.getDepartment() == null) {
+                throw new BadRequestException("Officer is not assigned to any department");
+            }
+            Long deptId = officer.getDepartment().getId();
+            if ("DEPT_POOL".equalsIgnoreCase(scope)) {
+                list = grievanceRepository.findDeptPoolGrievances(deptId);
+            } else if ("MY_TASKS".equalsIgnoreCase(scope)) {
+                list = grievanceRepository.findActiveGrievancesByOfficer(officerId);
+            } else if ("RESOLVED".equalsIgnoreCase(scope) || "RESOLVED_HISTORY".equalsIgnoreCase(scope)) {
+                list = grievanceRepository.findResolvedGrievancesByOfficer(officerId);
+            } else {
+                list = grievanceRepository.findByDepartment_IdOrderByCreatedAtDesc(deptId);
+            }
+        }
+
+        return list.stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<GrievanceResponse> getAssignedGrievances(Long officerId) {
+        return getOfficerDepartmentGrievances(officerId, null);
     }
 
     public GrievanceResponse updateStatus(Long grievanceId, Long officerId, UpdateStatusRequest request) {
@@ -162,8 +195,19 @@ public class GrievanceService {
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", officerId));
 
         boolean isAdmin = officer.getRole() == com.grievance.enums.Role.ADMIN;
-        if (!isAdmin && (grievance.getAssignedOfficer() == null || !grievance.getAssignedOfficer().getId().equals(officerId))) {
-            throw new UnauthorizedException("Only assigned officer or an administrator can update this grievance");
+        if (!isAdmin) {
+            if (officer.getDepartment() == null || !grievance.getDepartment().getId().equals(officer.getDepartment().getId())) {
+                throw new UnauthorizedException("You cannot modify grievances outside your assigned department");
+            }
+            if (grievance.getAssignedOfficer() == null || !grievance.getAssignedOfficer().getId().equals(officerId)) {
+                throw new UnauthorizedException("Only the assigned officer or an administrator can update this grievance");
+            }
+        }
+
+        String remarks = request.getEffectiveRemarks();
+        if ((request.getStatus() == GrievanceStatus.RESOLVED || request.getStatus() == GrievanceStatus.REJECTED)
+                && (remarks == null || remarks.trim().isEmpty())) {
+            throw new BadRequestException("Resolution remarks are required when resolving or rejecting a grievance");
         }
 
         GrievanceStatus oldStatus = grievance.getStatus();
@@ -174,7 +218,7 @@ public class GrievanceService {
                 .grievance(updatedGrievance)
                 .oldStatus(oldStatus)
                 .newStatus(request.getStatus())
-                .remarks(request.getRemarks())
+                .remarks(remarks.isEmpty() ? "Status updated to " + request.getStatus() : remarks)
                 .updatedByUser(officer)
                 .build();
 
@@ -394,20 +438,33 @@ public void closeByUser(Long grievanceId, Long userId, String remarks) {
     }
 }
 
-// ✅ ACCEPT GRIEVANCE BY OFFICER
+// ✅ ACCEPT GRIEVANCE BY OFFICER (Claim unassigned department grievance and start progress)
 public GrievanceResponse acceptGrievance(Long grievanceId, Long officerId) {
     Grievance grievance = grievanceRepository.findById(grievanceId)
             .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
 
-    if (!grievance.getAssignedOfficer().getId().equals(officerId)) {
-        throw new UnauthorizedException("Unauthorized to accept this grievance");
+    User officer = userRepository.findById(officerId)
+            .orElseThrow(() -> new ResourceNotFoundException("User", "id", officerId));
+
+    if (officer.getRole() != com.grievance.enums.Role.ADMIN) {
+        if (officer.getDepartment() == null) {
+            throw new BadRequestException("Officer does not belong to any department");
+        }
+        if (!grievance.getDepartment().getId().equals(officer.getDepartment().getId())) {
+            throw new UnauthorizedException("You cannot accept grievances outside your assigned department");
+        }
     }
 
-    if (grievance.getStatus() != GrievanceStatus.ASSIGNED) {
-        throw new BadRequestException("Grievance can only be accepted if it is in ASSIGNED status");
+    if (grievance.getStatus() == GrievanceStatus.RESOLVED || grievance.getStatus() == GrievanceStatus.REJECTED || grievance.getStatus() == GrievanceStatus.CLOSED_BY_USER) {
+        throw new BadRequestException("Cannot accept a completed or closed grievance");
+    }
+
+    if (grievance.getAssignedOfficer() != null && !grievance.getAssignedOfficer().getId().equals(officerId)) {
+        throw new BadRequestException("Grievance is already assigned to officer: " + grievance.getAssignedOfficer().getFullName());
     }
 
     GrievanceStatus oldStatus = grievance.getStatus();
+    grievance.setAssignedOfficer(officer);
     grievance.setStatus(GrievanceStatus.IN_PROGRESS);
     Grievance saved = grievanceRepository.save(grievance);
 
@@ -415,8 +472,8 @@ public GrievanceResponse acceptGrievance(Long grievanceId, Long officerId) {
             .grievance(saved)
             .oldStatus(oldStatus)
             .newStatus(GrievanceStatus.IN_PROGRESS)
-            .remarks("Accepted by officer")
-            .updatedByUser(grievance.getAssignedOfficer())
+            .remarks("Accepted and taken up by officer: " + officer.getFullName())
+            .updatedByUser(officer)
             .build();
     historyRepository.save(history);
 

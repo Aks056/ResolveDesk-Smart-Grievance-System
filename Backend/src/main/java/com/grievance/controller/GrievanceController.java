@@ -98,12 +98,14 @@ public class GrievanceController {
         return ResponseEntity.ok(grievanceService.getGrievanceDetails(id, requesterId, isAdminOrOfficer));
     }
 
-    // ================= ASSIGNED =================
+    // ================= ASSIGNED / DEPARTMENT SCOPE =================
     @GetMapping("/assigned")
     @PreAuthorize("hasAnyRole('OFFICER','ADMIN')")
-    public ResponseEntity<?> getAssignedGrievances(Authentication authentication) {
+    public ResponseEntity<?> getAssignedGrievances(
+            @RequestParam(required = false) String scope,
+            Authentication authentication) {
         Long officerId = getUserId(authentication);
-        return ResponseEntity.ok(grievanceService.getAssignedGrievances(officerId));
+        return ResponseEntity.ok(grievanceService.getOfficerDepartmentGrievances(officerId, scope));
     }
 
     // ================= STATUS UPDATE =================
@@ -159,7 +161,7 @@ public class GrievanceController {
 
     // ================= ACCEPT =================
     @PutMapping("/{id}/accept")
-    @PreAuthorize("hasRole('OFFICER')")
+    @PreAuthorize("hasAnyRole('OFFICER','ADMIN')")
     public ResponseEntity<?> acceptGrievance(@PathVariable Long id, Authentication authentication) {
         Long officerId = getUserId(authentication);
         return ResponseEntity.ok(grievanceService.acceptGrievance(id, officerId));

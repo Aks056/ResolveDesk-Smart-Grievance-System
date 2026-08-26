@@ -32,7 +32,7 @@ public class DashboardController {
     }
 
     @GetMapping("/officer")
-    @PreAuthorize("hasRole('OFFICER')")
+    @PreAuthorize("hasAnyRole('OFFICER','ADMIN')")
     public ResponseEntity<?> getOfficerDashboard(Authentication authentication) {
         log.debug("Fetching officer dashboard for: {}", authentication.getName());
         Long officerId = getUserIdFromAuthentication(authentication);

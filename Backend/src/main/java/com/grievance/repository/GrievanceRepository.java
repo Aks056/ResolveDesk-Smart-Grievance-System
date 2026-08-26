@@ -15,7 +15,7 @@ import java.util.Optional;
 
 /**
  * Repository for Grievance entity.
- * Provides database access methods for grievance management.
+ * Provides database access methods for grievance management and officer workflows.
  */
 @Repository
 public interface GrievanceRepository extends JpaRepository<Grievance, Long> {
@@ -34,6 +34,36 @@ public interface GrievanceRepository extends JpaRepository<Grievance, Long> {
 
     // Find all grievances by department
     List<Grievance> findByDepartment_IdOrderByCreatedAtDesc(Long departmentId);
+
+    // ================= OFFICER PORTAL SPECIFIC QUERIES =================
+
+    // Department Queue: Unassigned tickets in department pool
+    @Query("SELECT g FROM Grievance g WHERE g.department.id = :deptId AND g.assignedOfficer IS NULL AND g.status NOT IN ('RESOLVED', 'REJECTED', 'CLOSED_BY_USER') ORDER BY g.priority DESC, g.createdAt ASC")
+    List<Grievance> findDeptPoolGrievances(@Param("deptId") Long deptId);
+
+    // Active Workload: Tickets assigned to the officer currently being processed
+    @Query("SELECT g FROM Grievance g WHERE g.assignedOfficer.id = :officerId AND g.status NOT IN ('RESOLVED', 'REJECTED', 'CLOSED_BY_USER') ORDER BY g.createdAt DESC")
+    List<Grievance> findActiveGrievancesByOfficer(@Param("officerId") Long officerId);
+
+    // Resolved History: Tickets resolved/rejected by this officer
+    @Query("SELECT g FROM Grievance g WHERE g.assignedOfficer.id = :officerId AND g.status IN ('RESOLVED', 'REJECTED') ORDER BY g.updatedAt DESC")
+    List<Grievance> findResolvedGrievancesByOfficer(@Param("officerId") Long officerId);
+
+    // Resolved History: All tickets resolved/rejected in this department
+    @Query("SELECT g FROM Grievance g WHERE g.department.id = :deptId AND g.status IN ('RESOLVED', 'REJECTED') ORDER BY g.updatedAt DESC")
+    List<Grievance> findResolvedGrievancesByDepartment(@Param("deptId") Long deptId);
+
+    // Counts for Officer KPI cards
+    @Query("SELECT COUNT(g) FROM Grievance g WHERE g.department.id = :deptId AND g.assignedOfficer IS NULL AND g.status NOT IN ('RESOLVED', 'REJECTED', 'CLOSED_BY_USER')")
+    long countUnassignedByDepartment(@Param("deptId") Long deptId);
+
+    @Query("SELECT COUNT(g) FROM Grievance g WHERE g.assignedOfficer.id = :officerId AND g.status = 'IN_PROGRESS'")
+    long countActiveTasksByOfficer(@Param("officerId") Long officerId);
+
+    @Query("SELECT COUNT(g) FROM Grievance g WHERE g.assignedOfficer.id = :officerId AND g.status IN ('RESOLVED', 'REJECTED')")
+    long countResolvedByOfficer(@Param("officerId") Long officerId);
+
+    // ================= GENERAL QUERIES =================
 
     // Find pending grievances (not assigned)
     @Query("SELECT g FROM Grievance g WHERE g.status = 'PENDING' AND g.assignedOfficer IS NULL ORDER BY g.priority DESC, g.createdAt ASC")
