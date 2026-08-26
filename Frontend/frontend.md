@@ -1,153 +1,120 @@
 # Smart Grievance System - Frontend Documentation
 
-This document provides a comprehensive overview of the Smart Grievance System's frontend architecture, technology stack, and application flows.
+This document provides a comprehensive overview of the Smart Grievance System's frontend architecture, component structure, state management, and user interaction flows.
 
 ---
 
 ## 🚀 Technology Stack
 
-The application is built using modern web technologies to provide a premium, responsive, and high-performance user experience.
-
-- **Framework**: [React](https://reactjs.org/) (Version 18+)
-- **Build Tool**: [Vite](https://vitejs.dev/)
-- **Styling**: 
-  - [Tailwind CSS](https://tailwindcss.com/) for utility-first styling.
-  - [Shadcn UI](https://ui.shadcn.com/) for high-quality, accessible UI components.
-  - [Lucide React](https://lucide.dev/) for iconography.
-- **State Management**: [Redux Toolkit](https://redux-toolkit.js.org/)
-- **Routing**: [React Router DOM](https://reactrouter.com/) (Version 6+)
-- **API Communication**: [Axios](https://axios-http.com/)
-- **Data Visualization**: [Recharts](https://recharts.org/)
+* **Framework**: [React 18](https://reactjs.org/)
+* **Build Tool & Bundler**: [Vite](https://vitejs.dev/)
+* **Styling**:
+  * [Tailwind CSS 3.4](https://tailwindcss.com/) with custom dimensional themes.
+  * [Shadcn UI](https://ui.shadcn.com/) (Radix UI primitives for Sheet, Tabs, Table, Card, Dialog, Select, Badge, Input, Textarea).
+  * [Lucide React](https://lucide.dev/) for icons.
+  * [Sonner](https://sonner.emilkowal.ski/) for toast notifications.
+* **State Management**: [Redux Toolkit](https://redux-toolkit.js.org/) (`authSlice`).
+* **Routing**: [React Router DOM v7](https://reactrouter.com/) (Browser router with role-aware route guarding).
+* **HTTP Client**: [Axios](https://axios-http.com/) with request/response interceptors.
+* **Charts & Analytics**: [Recharts](https://recharts.org/).
 
 ---
 
-## 📁 Folder Structure
+## 📁 Component & Directory Structure
 
-```
+```text
 Frontend/
-├── public/              # Static assets (logos, icons)
+├── public/                 # Static assets and icons
 ├── src/
-│   ├── assets/          # Global styles and images
-│   ├── components/      # Reusable UI components
-│   │   ├── layout/      # Navbar, Footer, MainLayout
-│   │   └── ui/          # Shadcn UI base components
-│   ├── lib/             # Utilities and API configuration
-│   ├── pages/           # Route-specific page components
-│   ├── store/           # Redux store and slices
-│   ├── App.jsx          # Main routing and layout wrapper
-│   ├── main.jsx         # Application entry point
-│   └── index.css        # Global CSS and Tailwind directives
-├── package.json         # Project dependencies and scripts
-└── tailwind.config.js   # Tailwind CSS configuration
+│   ├── components/
+│   │   ├── layout/         # Navbar, Footer, MainLayout
+│   │   ├── ui/             # Shadcn UI primitives (card, tabs, sheet, table, etc.)
+│   │   ├── ProtectedRoute.jsx # Redux auth-guarded wrapper
+│   │   └── ScrollToTop.jsx # Route change scroll reset
+│   ├── lib/
+│   │   ├── api.js          # Axios instance and centralized API client methods
+│   │   └── utils.js        # Tailwind className merge helper (cn)
+│   ├── pages/
+│   │   ├── DashboardPage.jsx        # Citizen & Admin central dashboard
+│   │   ├── OfficerDashboardPage.jsx # Dedicated Officer Department Console
+│   │   ├── GrievanceDetailsPage.jsx # Individual ticket timeline & details
+│   │   ├── MyGrievancesPage.jsx     # Citizen submitted grievances list
+│   │   ├── NewGrievancePage.jsx     # Multipart complaint submission form
+│   │   ├── LoginPage.jsx            # User authentication
+│   │   ├── RegisterPage.jsx         # Citizen registration form
+│   │   └── ProfilePage.jsx          # User settings and credential management
+│   ├── store/
+│   │   ├── authSlice.js    # JWT token, user object & login/logout reducers
+│   │   └── index.js        # Redux store config
+│   ├── App.jsx             # Main Router configuration
+│   └── main.jsx            # Entry point
+└── tailwind.config.js      # Custom theme colors and tokens
 ```
 
 ---
 
-## 🔐 Authentication Flow
+## 👮 Officer Portal (`OfficerDashboardPage.jsx`)
 
-The system uses JWT-based authentication. The state is managed via Redux, and persistent sessions are handled using `localStorage`.
+The Officer Dashboard is designed specifically for departmental grievance officers to manage, claim, and resolve grievances under their jurisdiction.
 
 ```mermaid
-sequenceDiagram
-    participant User
-    participant LoginPage
-    participant Redux-AuthSlice
-    participant Backend-API
-    participant LocalStorage
+flowchart TD
+    subgraph Dashboard [Officer Dashboard]
+        KPI[4 Stat Cards: Pool, Active, Resolved, SLA]
+        Tabs[Shadcn Tabs: Queue | Workload | History]
+    end
 
-    User->>LoginPage: Enters Credentials
-    LoginPage->>Backend-API: POST /auth/login
-    Backend-API-->>LoginPage: { token, user }
-    LoginPage->>Redux-AuthSlice: dispatch(loginSuccess)
-    Redux-AuthSlice->>LocalStorage: Store token & user
-    Redux-AuthSlice-->>LoginPage: Update State (isAuthenticated)
-    LoginPage->>User: Redirect to /dashboard
+    subgraph Actions [Officer Operations]
+        T1[Dept Queue ➔ 'Accept & Start']
+        T2[My Workload ➔ 'Resolve / Reject']
+        T3[Resolved History ➔ 'View Case']
+    end
+
+    subgraph Drawer [Resolution Slide-over Drawer]
+        Summary[Citizen Info & Description]
+        Attachment[Evidence Attachment Preview]
+        Form[Outcome Dropdown + Mandatory Remarks]
+        Submit[PUT /api/grievances/id/status]
+    end
+
+    Tabs --> T1
+    Tabs --> T2
+    Tabs --> T3
+    T1 -->|Assign to Me & Set IN_PROGRESS| Tabs
+    T2 --> Drawer
+    Drawer --> Submit
+    Submit -->|Refresh Stats & Workload| Dashboard
 ```
 
-### Protected Routes
-Routes are wrapped in a `ProtectedRoute` component that checks the `isAuthenticated` state from Redux. If the user is not logged in, they are redirected to `/login`.
+### Key Components of Officer Portal:
+1. **KPI Stat Cards**:
+   * **Department Pool**: Number of unassigned tickets waiting in queue.
+   * **My Active Tasks**: Number of tickets currently in progress by the logged-in officer.
+   * **Resolved by Me**: Total resolved cases.
+   * **SLA Warnings**: Number of active tickets that have exceeded their priority turnaround time.
+2. **Tabbed Workflow**:
+   * **Department Queue**: Table of unassigned department tickets with an **"Accept & Start"** button.
+   * **My Active Workload**: Table of active cases with a **"Resolve / Reject"** button.
+   * **Resolved History**: Historical archive of completed outcomes and recorded remarks.
+3. **Resolution Slide-over Drawer**:
+   * Powered by Shadcn `Sheet`.
+   * Displays full description, citizen testimony, and image/document attachment viewer.
+   * Compulsory `resolutionRemarks` textarea with live character validation.
 
 ---
 
-## 📝 Grievance Submission Flow
+## 🔐 Role-Aware Navigation & Routing
 
-Users can submit grievances through a multi-part form that supports file uploads (evidence).
+In `App.jsx`, the `/dashboard` path dynamically renders the correct view based on the user's authenticated role:
 
-```mermaid
-graph TD
-    A[NewGrievancePage] --> B{Fetch Departments}
-    B -- Success --> C[Render Form]
-    C --> D[User Fills Data & Attaches File]
-    D --> E[Create FormData]
-    E --> F[POST /api/grievances]
-    F -- Success --> G[Show Success Modal]
-    G --> H[Redirect to Dashboard]
-    F -- Failure --> I[Show Error Modal]
+```jsx
+const DashboardRoute = () => {
+  const { user } = useSelector((state) => state.auth);
+  if (user?.role === 'OFFICER') {
+    return <OfficerDashboardPage />;
+  }
+  return <DashboardPage />;
+};
 ```
 
-### Multiparts Handling
-The submission uses `FormData` to handle both JSON data (title, description, etc.) and the evidence file.
-- **Header**: `Content-Type: multipart/form-data`
-
----
-
-## 📊 Dashboard Data Flow
-
-The dashboard dynamically fetches data based on the user's role (Citizen or Admin) to show relevant statistics and recent activities.
-
-```mermaid
-sequenceDiagram
-    participant Dashboard
-    participant API
-    participant Redux
-
-    Dashboard->>Redux: Get User Role
-    Dashboard->>API: GET /api/dashboard/{role}
-    API-->>Dashboard: Return Stats (Resolved, Pending, etc.)
-    Dashboard->>API: GET /api/grievances/recent
-    API-->>Dashboard: Return Recent Tickets
-    Dashboard->>Dashboard: Update Local State & Render Charts
-```
-
----
-
-## 🔌 API Endpoint Mappings
-
-All API calls are routed through a central Axios instance in `lib/api.js`.
-
-| Method | Endpoint | Description | Usage |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/auth/login` | User authentication | `LoginPage` |
-| `GET` | `/grievances/all` | Fetch all grievances (Admin / User global feed) | `RecentGrievancesPage` |
-| `GET` | `/grievances/my` | Fetch citizen's grievances | `MyGrievancesPage` |
-| `GET` | `/grievances/recent` | Fetch most recent grievances | `DashboardPage` |
-| `GET` | `/grievances/departments` | Fetch available departments | `NewGrievancePage` |
-| `POST` | `/grievances` | Submit a new grievance | `NewGrievancePage` |
-| `GET` | `/grievances/{id}` | Fetch grievance details | `GrievanceDetailsPage` |
-| `GET` | `/grievances/{id}/history` | Fetch grievance status history | `GrievanceDetailsPage` |
-| `PUT` | `/grievances/{id}/close` | Close/Archive a grievance | `GrievanceDetailsPage` |
-| `POST` | `/grievances/{id}/upvote` | Toggle upvote for a grievance | `DashboardPage`, `RecentGrievancesPage` |
-| `POST` | `/feedback` | Submit feedback for resolved grievance | `GrievanceDetailsPage` |
-| `GET` | `/feedback/grievance/{id}`| Fetch feedback for a specific grievance | `GrievanceDetailsPage` |
-| `GET` | `/dashboard/{role}` | Fetch role-specific statistics | `DashboardPage` |
-| `GET` | `/user/profile` | Fetch user profile data | `ProfilePage` |
-| `PUT` | `/user/profile` | Update user profile data | `ProfilePage` |
-| `PUT` | `/user/change-password` | Update account password | `ProfilePage` |
-
-### 🛠️ Client-Side Protected Routes & Views
-- `/privacy-policy` -> Accessible via Layout Footer link. Renders `PrivacyPolicyPage.jsx`.
-
----
-
-## 🔧 Technical Details
-
-### 1. API Interceptors
-The application uses Axios interceptors to:
-- **Request**: Automatically inject the JWT token from the Redux store into the `Authorization` header.
-- **Response**: Handle `401 Unauthorized` errors by automatically logging out the user and clearing the session.
-
-### 2. State Persistence
-The `authSlice` synchronizes the logic state with `localStorage`, ensuring the user remains logged in after a page refresh.
-
-### 3. Responsive Layout
-The `MainLayout` uses a flexible flexbox structure with a sticky footer and a responsive navbar, ensuring a seamless experience across mobile, tablet, and desktop devices.
+Explicit paths `/officer` and `/officer-dashboard` are also routed directly to `OfficerDashboardPage`.
