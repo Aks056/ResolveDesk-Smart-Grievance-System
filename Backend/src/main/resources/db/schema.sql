@@ -100,9 +100,4 @@ INSERT INTO departments (name, description, contact_email, is_active) VALUES
 ('Education', 'Department for educational institutions', 'education@govt.com', true)
 ON DUPLICATE KEY UPDATE name = name;
 
--- Sample Admin User (password: admin@123)
--- You should change this in production!
-INSERT INTO users (username, email, password_hash, first_name, last_name, phone, role, is_active)
-SELECT 'admin', 'admin@grievance.com', '$2a$10$dXj3SW6G7P50eS3UQ3OO2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUm', 'System', 'Admin', '9999999999', 'ADMIN', true
-WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin')
-LIMIT 1;
+

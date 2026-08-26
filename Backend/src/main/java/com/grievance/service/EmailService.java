@@ -9,6 +9,10 @@ import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Service for dispatching email notifications.
+ * Automatically mocks/simulates email delivery in development mode when placeholder SMTP credentials are detected.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -16,150 +20,121 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${app.mail.from}")
+    @Value("${spring.mail.username:}")
+    private String mailUsername;
+
+    @Value("${spring.mail.password:}")
+    private String mailPassword;
+
+    @Value("${app.mail.from:admin@grievance-system.com}")
     private String mailFrom;
 
-    @Value("${app.mail.fromName}")
+    @Value("${app.mail.fromName:Smart Grievance System}")
     private String mailFromName;
 
-    @Async
-    public void sendWelcomeEmail(String recipientEmail, String fullName) {
-        log.info("Sending welcome email to: {}", recipientEmail);
+    /**
+     * Checks whether real SMTP credentials are configured.
+     */
+    private boolean isSmtpConfigured() {
+        return mailUsername != null 
+                && !mailUsername.isBlank() 
+                && !mailUsername.contains("your-email") 
+                && !mailUsername.equals("your-email@gmail.com")
+                && mailPassword != null 
+                && !mailPassword.isBlank() 
+                && !mailPassword.equals("your-app-password");
+    }
+
+    private void dispatchEmail(String recipientEmail, String subject, String content) {
+        if (!isSmtpConfigured() || recipientEmail == null || recipientEmail.endsWith("@email.com") || recipientEmail.endsWith("@example.com")) {
+            log.info("📧 [Dev Email Mock] To: <{}> | Subject: \"{}\" (Simulated - configure real SMTP in application.properties to send live emails)", recipientEmail, subject);
+            return;
+        }
 
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(mailFrom);
             message.setTo(recipientEmail);
-            message.setSubject("Welcome to Smart Grievance Redressal System");
-
-            String content = String.format(
-                    "Dear %s,\n\n" +
-                    "Welcome to Smart Grievance Redressal System!\n\n" +
-                    "You have successfully registered with us. You can now:\n" +
-                    "- Submit grievances\n" +
-                    "- Track their status\n" +
-                    "- Provide feedback\n\n" +
-                    "Best regards,\n" +
-                    "Smart Grievance System Team",
-                    fullName
-            );
-
+            message.setSubject(subject);
             message.setText(content);
             mailSender.send(message);
-            log.info("Welcome email sent to: {}", recipientEmail);
+            log.info("✅ Live email successfully dispatched to: {}", recipientEmail);
         } catch (Exception e) {
-            log.error("Error sending welcome email to: {}", recipientEmail, e);
+            log.warn("⚠️ SMTP Dispatch skipped/failed for <{}>: {} (Check credentials in application.properties)", recipientEmail, e.getMessage());
         }
+    }
+
+    @Async
+    public void sendWelcomeEmail(String recipientEmail, String fullName) {
+        String subject = "Welcome to Smart Grievance Redressal System";
+        String content = String.format(
+                "Dear %s,\n\n" +
+                "Welcome to Smart Grievance Redressal System!\n\n" +
+                "You have successfully registered. You can now:\n" +
+                "- Submit grievances\n" +
+                "- Track real-time progress\n" +
+                "- Provide post-resolution feedback\n\n" +
+                "Best regards,\n" +
+                "Smart Grievance System Team",
+                fullName != null ? fullName : "Citizen"
+        );
+        dispatchEmail(recipientEmail, subject, content);
     }
 
     @Async
     public void sendGrievanceSubmittedEmail(String recipientEmail, String grievanceNumber) {
-        log.info("Sending grievance submitted confirmation to: {}", recipientEmail);
-
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(mailFrom);
-            message.setTo(recipientEmail);
-            message.setSubject("Grievance Submitted - " + grievanceNumber);
-
-            String content = String.format(
-                    "Your grievance has been successfully submitted.\n\n" +
-                    "Grievance Number: %s\n" +
-                    "You can track this grievance using the web portal.\n\n" +
-                    "Thank you,\n" +
-                    "Smart Grievance System Team",
-                    grievanceNumber
-            );
-
-            message.setText(content);
-            mailSender.send(message);
-            log.info("Grievance submission email sent to: {}", recipientEmail);
-        } catch (Exception e) {
-            log.error("Error sending grievance submission email to: {}", recipientEmail, e);
-        }
+        String subject = "Grievance Submitted - " + grievanceNumber;
+        String content = String.format(
+                "Your grievance has been successfully submitted.\n\n" +
+                "Grievance Tracking Number: %s\n" +
+                "You can track the progress anytime via the portal dashboard.\n\n" +
+                "Thank you,\n" +
+                "Smart Grievance System Team",
+                grievanceNumber
+        );
+        dispatchEmail(recipientEmail, subject, content);
     }
 
     @Async
     public void sendStatusUpdateEmail(String recipientEmail, String grievanceNumber, String newStatus) {
-        log.info("Sending status update email to: {}", recipientEmail);
-
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(mailFrom);
-            message.setTo(recipientEmail);
-            message.setSubject("Grievance Status Updated - " + grievanceNumber);
-
-            String content = String.format(
-                    "Your grievance status has been updated.\n\n" +
-                    "Grievance Number: %s\n" +
-                    "New Status: %s\n\n" +
-                    "Please check the portal for more details.\n\n" +
-                    "Best regards,\n" +
-                    "Smart Grievance System Team",
-                    grievanceNumber, newStatus
-            );
-
-            message.setText(content);
-            mailSender.send(message);
-            log.info("Status update email sent to: {}", recipientEmail);
-        } catch (Exception e) {
-            log.error("Error sending status update email to: {}", recipientEmail, e);
-        }
+        String subject = "Grievance Status Updated - " + grievanceNumber;
+        String content = String.format(
+                "Your grievance status has been updated.\n\n" +
+                "Grievance Number: %s\n" +
+                "New Status: %s\n\n" +
+                "Please log in to the portal for complete resolution notes.\n\n" +
+                "Best regards,\n" +
+                "Smart Grievance System Team",
+                grievanceNumber, newStatus
+        );
+        dispatchEmail(recipientEmail, subject, content);
     }
 
     @Async
     public void sendAssignmentEmail(String recipientEmail, String grievanceNumber) {
-        log.info("Sending grievance assignment notification to: {}", recipientEmail);
-
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(mailFrom);
-            message.setTo(recipientEmail);
-            message.setSubject("Grievance Assigned to You - " + grievanceNumber);
-
-            String content = String.format(
-                    "A new grievance has been assigned to you.\n\n" +
-                    "Grievance Number: %s\n" +
-                    "Please log in to the portal to view and process this grievance.\n\n" +
-                    "Best regards,\n" +
-                    "Smart Grievance System Team",
-                    grievanceNumber
-            );
-
-            message.setText(content);
-            mailSender.send(message);
-            log.info("Assignment notification sent to: {}", recipientEmail);
-        } catch (Exception e) {
-            log.error("Error sending assignment email to: {}", recipientEmail, e);
-        }
+        String subject = "Grievance Assigned to You - " + grievanceNumber;
+        String content = String.format(
+                "A new departmental grievance has been assigned to you.\n\n" +
+                "Grievance Number: %s\n" +
+                "Please log in to the Officer Portal to review and take action.\n\n" +
+                "Best regards,\n" +
+                "Smart Grievance System Team",
+                grievanceNumber
+        );
+        dispatchEmail(recipientEmail, subject, content);
     }
 
     @Async
     public void sendResolutionEmail(String recipientEmail, String grievanceNumber) {
-        log.info("Sending resolution notification to: {}", recipientEmail);
-
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(mailFrom);
-            message.setTo(recipientEmail);
-            message.setSubject("Your Grievance Has Been Resolved - " + grievanceNumber);
-
-            String content = String.format(
-                    "Your grievance has been marked as resolved.\n\n" +
-                    "Grievance Number: %s\n" +
-                    "You can now provide feedback on your experience.\n\n" +
-                    "Best regards,\n" +
-                    "Smart Grievance System Team",
-                    grievanceNumber
-            );
-
-            message.setText(content);
-            mailSender.send(message);
-            log.info("Resolution notification sent to: {}", recipientEmail);
-        } catch (Exception e) {
-            log.error("Error sending resolution email to: {}", recipientEmail, e);
-        }
+        String subject = "Your Grievance Has Been Resolved - " + grievanceNumber;
+        String content = String.format(
+                "Your grievance has been resolved.\n\n" +
+                "Grievance Number: %s\n" +
+                "Please log in to review the resolution details and share your feedback rating.\n\n" +
+                "Best regards,\n" +
+                "Smart Grievance System Team",
+                grievanceNumber
+        );
+        dispatchEmail(recipientEmail, subject, content);
     }
 }
-
-
