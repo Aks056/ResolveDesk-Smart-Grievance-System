@@ -63,7 +63,7 @@ const RecentGrievancesPage = () => {
     if (isAdmin) {
       const fetchOfficers = async () => {
         try {
-          const res = await api.get('/api/grievances/officers');
+          const res = await api.get('/grievances/officers');
           setOfficers(res.data || []);
         } catch (err) {
           console.error("Failed to fetch officers", err);

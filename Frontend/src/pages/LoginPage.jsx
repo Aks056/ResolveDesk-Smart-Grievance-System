@@ -36,7 +36,10 @@ const LoginPage = () => {
       navigate('/dashboard');
     } catch (err) {
       console.error(err);
-      dispatch(loginFailure(err.response?.data?.message || 'Login failed. Please check your credentials.'));
+      const errMsg = typeof err.response?.data === 'string'
+        ? err.response.data
+        : (err.response?.data?.message || 'Login failed. Please check your credentials.');
+      dispatch(loginFailure(errMsg));
     }
   };
 
