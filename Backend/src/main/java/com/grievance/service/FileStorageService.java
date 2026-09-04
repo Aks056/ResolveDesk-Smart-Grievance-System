@@ -4,6 +4,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.grievance.config.FileUploadProperties;
+import com.grievance.exception.BadRequestException;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -27,18 +28,29 @@ public class FileStorageService {
             return null;
         }
 
+        // Validate file size
+        if (file.getSize() > fileUploadProperties.getUpload().getMaxFileSizeBytes()) {
+            throw new BadRequestException("File size exceeds the maximum allowed size of " + (fileUploadProperties.getUpload().getMaxFileSizeBytes() / 1_048_576) + "MB");
+        }
+
         // Validate file extension
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null) {
-            throw new IllegalArgumentException("File name is null");
+            throw new BadRequestException("File name is null");
         }
 
         String extension = getFileExtension(originalFilename);
         if (!isAllowedExtension(extension)) {
-            throw new IllegalArgumentException("File type not allowed: " + extension);
+            throw new BadRequestException("File type not allowed: " + extension);
         }
 
-        // Create upload directory if it doesn't exist
+        // Validate content type
+        String contentType = file.getContentType();
+        if (contentType == null || !isAllowedContentType(contentType)) {
+            throw new BadRequestException("File content type not allowed: " + contentType);
+        }
+
+        // Create upload directory if it does not exist
         String uploadDir = fileUploadProperties.getUpload().getDir();
         Path uploadPath = Paths.get(uploadDir);
         if (!Files.exists(uploadPath)) {
@@ -74,5 +86,11 @@ public class FileStorageService {
             }
         }
         return false;
+    }
+
+    private boolean isAllowedContentType(String contentType) {
+        return "image/jpeg".equals(contentType)
+            || "image/png".equals(contentType)
+            || "application/pdf".equals(contentType);
     }
 }

@@ -83,10 +83,10 @@ const RecentGrievancesPage = () => {
 
   const displayOfficers = useMemo(() => {
     return officers.length > 0 ? officers : [
-      { id: 101, fullName: "Dr. Alok Mishra", departmentName: "Electricity Dept" },
-      { id: 102, fullName: "Prof. Sunita Sharma", departmentName: "Academic Section" },
-      { id: 103, fullName: "Er. Ramesh Verma", departmentName: "Water Works" },
-      { id: 104, fullName: "Dr. Rajesh Gupta", departmentName: "Medical & Health" }
+      { id: 101, fullName: "Hostel Warden", departmentName: "Hostel & Accommodation" },
+      { id: 102, fullName: "Exam Cell", departmentName: "Academics & Examinations" },
+      { id: 103, fullName: "IT Support", departmentName: "IT & Infrastructure" },
+      { id: 104, fullName: "Mess Supervisor", departmentName: "Canteen & Mess" }
     ];
   }, [officers]);
 

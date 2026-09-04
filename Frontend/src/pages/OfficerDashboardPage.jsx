@@ -36,7 +36,7 @@ const OfficerDashboardPage = () => {
     myActiveTasksCount: 0,
     myResolvedCount: 0,
     slaBreachedCount: 0,
-    departmentName: user?.departmentName || 'Public Works'
+    departmentName: user?.departmentName || ''
   });
 
   // Table & Tab state

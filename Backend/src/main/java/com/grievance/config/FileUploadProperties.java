@@ -16,6 +16,7 @@ public class FileUploadProperties {
     @Data
     public static class Upload {
         private String dir = "uploads/";
+        private long maxFileSizeBytes = 5_242_880; // 5MB default
     }
 
     @Data
