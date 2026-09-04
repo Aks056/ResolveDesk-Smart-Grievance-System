@@ -2,6 +2,9 @@ package com.grievance.service;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.modelmapper.ModelMapper;
@@ -52,6 +55,16 @@ public class GrievanceService {
     private FileStorageService fileStorageService;
     private ModelMapper modelMapper;
     private GrievanceUpvoteRepository upvoteRepository;
+    
+    private static final Map<GrievanceStatus, Set<GrievanceStatus>> ALLOWED_TRANSITIONS = new HashMap<>();
+    static {
+        ALLOWED_TRANSITIONS.put(GrievanceStatus.PENDING, Set.of(GrievanceStatus.ASSIGNED, GrievanceStatus.REJECTED));
+        ALLOWED_TRANSITIONS.put(GrievanceStatus.ASSIGNED, Set.of(GrievanceStatus.IN_PROGRESS, GrievanceStatus.REJECTED));
+        ALLOWED_TRANSITIONS.put(GrievanceStatus.IN_PROGRESS, Set.of(GrievanceStatus.RESOLVED, GrievanceStatus.REJECTED));
+        ALLOWED_TRANSITIONS.put(GrievanceStatus.RESOLVED, Set.of());
+        ALLOWED_TRANSITIONS.put(GrievanceStatus.REJECTED, Set.of());
+        ALLOWED_TRANSITIONS.put(GrievanceStatus.CLOSED_BY_USER, Set.of());
+    }
 
     public GrievanceResponse submitGrievance(Long userId, GrievanceRequest request, MultipartFile file) {
         log.info("Submitting new grievance for user ID: {}", userId);
@@ -204,6 +217,10 @@ public class GrievanceService {
             }
         }
 
+        // Validate status transition
+        if (!ALLOWED_TRANSITIONS.getOrDefault(grievance.getStatus(), Set.of()).contains(request.getStatus())) {
+            throw new BadRequestException("Cannot change status from " + grievance.getStatus() + " to " + request.getStatus());
+        }
         String remarks = request.getEffectiveRemarks();
         if ((request.getStatus() == GrievanceStatus.RESOLVED || request.getStatus() == GrievanceStatus.REJECTED)
                 && (remarks == null || remarks.trim().isEmpty())) {
@@ -463,6 +480,10 @@ public GrievanceResponse acceptGrievance(Long grievanceId, Long officerId) {
         throw new BadRequestException("Grievance is already assigned to officer: " + grievance.getAssignedOfficer().getFullName());
     }
 
+    // Validate status transition
+    if (!ALLOWED_TRANSITIONS.getOrDefault(grievance.getStatus(), Set.of()).contains(GrievanceStatus.IN_PROGRESS)) {
+        throw new BadRequestException("Cannot change status from " + grievance.getStatus() + " to " + GrievanceStatus.IN_PROGRESS);
+    }
     GrievanceStatus oldStatus = grievance.getStatus();
     grievance.setAssignedOfficer(officer);
     grievance.setStatus(GrievanceStatus.IN_PROGRESS);

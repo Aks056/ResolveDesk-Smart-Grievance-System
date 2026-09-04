@@ -147,10 +147,10 @@ const DashboardPage = () => {
   // Display officers list with fallback dummy values if empty
   const displayOfficers = useMemo(() => {
     return officers.length > 0 ? officers : [
-      { id: 101, fullName: "Dr. Alok Mishra", departmentName: "Electricity Dept" },
-      { id: 102, fullName: "Prof. Sunita Sharma", departmentName: "Academic Section" },
-      { id: 103, fullName: "Er. Ramesh Verma", departmentName: "Water Works" },
-      { id: 104, fullName: "Dr. Rajesh Gupta", departmentName: "Medical & Health" }
+      { id: 101, fullName: "Hostel Warden", departmentName: "Hostel & Accommodation" },
+      { id: 102, fullName: "Exam Cell", departmentName: "Academics & Examinations" },
+      { id: 103, fullName: "IT Support", departmentName: "IT & Infrastructure" },
+      { id: 104, fullName: "Mess Supervisor", departmentName: "Canteen & Mess" }
     ];
   }, [officers]);
 
@@ -319,10 +319,10 @@ const DashboardPage = () => {
 
   // Department Workload Data (Horizontal Bar Chart)
   const departmentWorkloadData = useMemo(() => [
-    { name: 'Academic Section', active: 18, fill: '#6366f1' },
-    { name: 'Electricity Dept', active: 12, fill: '#f59e0b' },
-    { name: 'Water Works', active: 8, fill: '#3b82f6' },
-    { name: 'Medical & Health', active: 15, fill: '#ef4444' }
+    { name: 'Hostel & Accommodation', active: 18, fill: '#6366f1' },
+    { name: 'Academics & Examinations', active: 12, fill: '#f59e0b' },
+    { name: 'IT & Infrastructure', active: 8, fill: '#3b82f6' },
+    { name: 'Canteen & Mess', active: 15, fill: '#ef4444' }
   ], []);
 
   // Resolution Trend Data (Line Chart) over last 7 days
