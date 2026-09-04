@@ -15,12 +15,14 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.grievance.dto.request.GrievanceRequest;
 import com.grievance.dto.request.UpdateStatusRequest;
-import com.grievance.dto.response.GrievanceResponse;
 import com.grievance.enums.Priority;
+import com.grievance.dto.response.GrievanceResponse;
 import com.grievance.security.CustomUserDetails;
 import com.grievance.service.GrievanceService;
 import com.grievance.service.DepartmentService;
@@ -49,27 +51,13 @@ public class GrievanceController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<?> submitGrievance(
-            @RequestParam String title,
-            @RequestParam String description,
-            @RequestParam Long departmentId,
-            @RequestParam String priority,
-            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestPart("data") @Valid GrievanceRequest data,
+            @RequestPart(value = "file", required = false) MultipartFile file,
             Authentication authentication) {
 
-        try {
-            Long userId = getUserId(authentication);
-            Priority priorityEnum = Priority.valueOf(priority.toUpperCase());
-
-            GrievanceResponse grievance = grievanceService.submitGrievance(
-                    userId, title, description, departmentId, priorityEnum, file);
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(grievance);
-
-        } catch (Exception e) {
-            log.error("Error submitting grievance", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error submitting grievance");
-        }
+        Long userId = getUserId(authentication);
+        GrievanceResponse grievance = grievanceService.submitGrievance(userId, data, file);
+        return ResponseEntity.status(HttpStatus.CREATED).body(grievance);
     }
 
     // ================= MY =================

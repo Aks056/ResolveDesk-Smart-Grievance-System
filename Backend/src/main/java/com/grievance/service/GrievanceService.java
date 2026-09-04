@@ -14,6 +14,7 @@ import java.io.IOException;
 
 import org.springframework.web.multipart.MultipartFile;
 
+import com.grievance.dto.request.GrievanceRequest;
 import com.grievance.dto.request.UpdateStatusRequest;
 import com.grievance.dto.response.GrievanceResponse;
 import com.grievance.dto.response.GrievanceHistoryResponse;
@@ -52,15 +53,14 @@ public class GrievanceService {
     private ModelMapper modelMapper;
     private GrievanceUpvoteRepository upvoteRepository;
 
-    public GrievanceResponse submitGrievance(Long userId, String title, String description, 
-            Long departmentId, Priority priority, MultipartFile file) {
+    public GrievanceResponse submitGrievance(Long userId, GrievanceRequest request, MultipartFile file) {
         log.info("Submitting new grievance for user ID: {}", userId);
 
         User citizen = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
-        var department = departmentRepository.findById(departmentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Department", "id", departmentId));
+        var department = departmentRepository.findById(request.getDepartmentId())
+                .orElseThrow(() -> new ResourceNotFoundException("Department", "id", request.getDepartmentId()));
 
         String grievanceNumber = "GRV-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
 
@@ -80,11 +80,11 @@ public class GrievanceService {
                 .grievanceNumber(grievanceNumber)
                 .citizen(citizen)
                 .department(department)
-                .title(title)
-                .description(description)
-                .priority(priority)
+                .title(request.getTitle())
+                .description(request.getDescription())
+                .priority(request.getPriority())
                 .status(GrievanceStatus.PENDING)
-                .resolutionDays(priority.getResolutionDays())
+                .resolutionDays(request.getPriority().getResolutionDays())
                 .attachmentUrl(attachmentUrl)
                 .build();
 
