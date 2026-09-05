@@ -46,13 +46,6 @@ public class OfficerController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/statistics")
-    public ResponseEntity<?> getOfficerStatistics(Authentication authentication) {
-        log.debug("Fetching officer statistics");
-        // Return officer-specific statistics
-        return ResponseEntity.ok("Officer Statistics");
-    }
-
     private Long getUserIdFromAuthentication(Authentication authentication) {
         if (authentication == null || !(authentication.getPrincipal() instanceof CustomUserDetails)) {
             throw new RuntimeException("User not authenticated properly");
