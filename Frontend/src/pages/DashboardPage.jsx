@@ -317,25 +317,48 @@ const DashboardPage = () => {
     }
   };
 
-  // Department Workload Data (Horizontal Bar Chart)
-  const departmentWorkloadData = useMemo(() => [
-    { name: 'Hostel & Accommodation', active: 18, fill: '#6366f1' },
-    { name: 'Academics & Examinations', active: 12, fill: '#f59e0b' },
-    { name: 'IT & Infrastructure', active: 8, fill: '#3b82f6' },
-    { name: 'Canteen & Mess', active: 15, fill: '#ef4444' }
-  ], []);
 
-  // Resolution Trend Data (Line Chart) over last 7 days
-  const resolutionTrendData = useMemo(() => [
-    { day: 'Mon', created: 12, resolved: 8 },
-    { day: 'Tue', created: 19, resolved: 14 },
-    { day: 'Wed', created: 15, resolved: 16 },
-    { day: 'Thu', created: 22, resolved: 18 },
-    { day: 'Fri', created: 30, resolved: 21 },
-    { day: 'Sat', created: 18, resolved: 24 },
-    { day: 'Sun', created: 14, resolved: 15 }
-  ], []);
+  // Department Workload Data — computed from allGrievances (active = not resolved/rejected/closed)
+  const deptColors = { 'Hostel & Accommodation': '#6366f1', 'Academics & Examinations': '#f59e0b', 'IT & Infrastructure': '#3b82f6', 'Canteen & Mess': '#ef4444', 'Administration': '#8b5cf6' };
+  const departmentWorkloadData = useMemo(() => {
+    const activeStatuses = ['PENDING', 'ASSIGNED', 'IN_PROGRESS'];
+    const counts = {};
+    allGrievances.forEach(g => {
+      if (activeStatuses.includes(g.status) && g.departmentName) {
+        counts[g.departmentName] = (counts[g.departmentName] || 0) + 1;
+      }
+    });
+    const fallbackColors = ['#6366f1','#10b981','#3b82f6','#f59e0b','#ef4444','#8b5cf6'];
+    return Object.entries(counts)
+      .map(([name, active], i) => ({ name, active, fill: deptColors[name] || fallbackColors[i % 6] }))
+      .sort((a, b) => b.active - a.active);
+  }, [allGrievances]);
 
+  // Resolution Trend Data — computed from allGrievances over last 7 days
+  const resolutionTrendData = useMemo(() => {
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      d.setHours(0, 0, 0, 0);
+      days.push({ date: d, label: dayNames[d.getDay()] });
+    }
+    return days.map(({ date, label }) => {
+      const dayStart = date.getTime();
+      const dayEnd = dayStart + 86400000;
+      const created = allGrievances.filter(g => {
+        const t = parseDate(g.createdAt).getTime();
+        return t >= dayStart && t < dayEnd;
+      }).length;
+      const resolved = allGrievances.filter(g => {
+        if (g.status !== 'RESOLVED') return false;
+        const t = parseDate(g.updatedAt || g.createdAt).getTime();
+        return t >= dayStart && t < dayEnd;
+      }).length;
+      return { day: label, created, resolved };
+    });
+  }, [allGrievances]);
   // Chart Data
   const statusData = useMemo(() => [
     { name: 'Resolved', value: stats.resolvedGrievances || 0, color: '#22c55e' },
@@ -455,7 +478,7 @@ const DashboardPage = () => {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 font-bold tracking-wider uppercase text-[10px]">
-                AKTU Student Grievance Portal
+                College Campus Grievance Portal
               </Badge>
               <div className="h-4 w-[1px] bg-border mx-1" />
               <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">

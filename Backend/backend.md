@@ -1,6 +1,6 @@
-# Smart Grievance System - Backend Documentation
+# Smart Grievance Redressal System - Backend Documentation
 
-This document provides a comprehensive overview of the backend architecture, technology stack, API endpoints, officer portal redressal flow, and security configurations.
+This document provides a comprehensive overview of the backend architecture, technology stack, API endpoints, officer portal redressal flow, and security configurations. This is a college campus grievance redressal backend (college campus grievance redressal system).
 
 ---
 
@@ -10,7 +10,7 @@ This document provides a comprehensive overview of the backend architecture, tec
 *   **Core Framework**: [Spring Boot 3.1.5](https://spring.io/projects/spring-boot)
 *   **Security**: [Spring Security 6](https://spring.io/projects/spring-security) with stateless JWT authentication via **JJWT (io.jsonwebtoken 0.12.3)**.
 *   **Database**: [MySQL 8.0](https://www.mysql.com/) with HikariCP connection pooling and Spring Data JPA (Hibernate 6.2).
-*   **API Documentation**: [Springdoc OpenAPI 2.0](https://springdoc.org/) (`/swagger-ui.html`).
+*   **API Documentation**: [Springdoc OpenAPI 2.1.x](https://springdoc.org/) (`/swagger-ui.html`; OpenAPI spec at `/api-docs`).
 *   **DTO Mapping**: [ModelMapper](https://modelmapper.org/) with explicit response decorators.
 *   **Boilerplate Control**: [Lombok](https://projectlombok.org/).
 *   **Email Notification**: Spring Boot Mail (`JavaMailSender`) with automatic development mocking.
@@ -31,9 +31,10 @@ The backend follows an **N-Tier Layered Architecture** with strict boundary sepa
 ## 3. Officer Redressal & Department Security
 
 ### Department Scoping Logic
-* An officer belongs to a specific Department (`department_id` in the `User` entity).
-* Officers are strictly prevented from querying, claiming, or modifying grievances belonging to other departments.
-* When claiming or updating a grievance, the system verifies `officer.getDepartment().getId().equals(grievance.getDepartment().getId())`.
+* An officer belongs to a specific Department (`department_id` in the `User` entity), set through admin assignment or seeded once per department during dev startup.
+* Officers are strictly scoped to their assigned department: the backend enforces this at every query and mutation (claim, update status, etc.).
+* The enforcement checks vehicles include `officer.getDepartment().getId().equals(grievance.getDepartment().getId())` for ownership/claim actions, plus scope filtering on the assigned-grievances query (`DEPT_POOL`, `MY_TASKS`, `RESOLVED`) that always scopes to the officer's department.
+* **Privacy masking for non-admin/non-officer callers**: `getGrievanceDetails` masks sensitive fields for regular authenticated students; `getRecentGrievances` and the global feed return a privacy-safe projection. Full details require ownership, officer, or admin context.
 
 ### Grievance Lifecycle Transitions
 ```mermaid
@@ -65,13 +66,13 @@ stateDiagram-v2
 | `/api/grievances` | `POST` | USER | Submit new grievance with multipart attachment | `title`, `description`, `departmentId`, `priority`, `file` |
 | `/api/grievances/my` | `GET` | USER | List current citizen's grievances | N/A |
 | `/api/grievances/assigned` | `GET` | OFFICER, ADMIN | Fetch grievances filtered by scope (`DEPT_POOL`, `MY_TASKS`, `RESOLVED`) | `?scope=DEPT_POOL` |
-| `/api/grievances/{id}/accept` | `PUT` | OFFICER, ADMIN | Claim unassigned grievance and transition to `IN_PROGRESS` | Path Variable `id` |
-| `/api/grievances/{id}/status` | `PUT` | OFFICER, ADMIN | Resolve or reject grievance with mandatory remarks | `UpdateStatusRequest` (`status`, `resolutionRemarks`) |
-| `/api/grievances/{id}` | `GET` | Authenticated | View grievance details (masked for third-party viewers) | Path Variable `id` |
-| `/api/grievances/{id}/history`| `GET` | Authenticated | Retrieve audit history timeline | Path Variable `id` |
-| `/api/grievances/{id}/upvote` | `POST` | Authenticated | Toggle upvote count | Path Variable `id` |
-| `/api/grievances/{id}/close` | `PUT` | USER | Close/cancel grievance by owner | Path Variable `id` |
-| `/api/grievances/{id}` | `DELETE` | ADMIN | Delete grievance from system | Path Variable `id` |
+| `/api/grievances/{id}/accept` | `PUT` | OFFICER, ADMIN | Claim a department-pool (unassigned/assigned) grievance and transition to `IN_PROGRESS` (`Accept & Start`). Requires the ticket to be eligible for the officer's department. | Path Variable `id` |
+| `/api/grievances/{id}/status` | `PUT` | OFFICER, ADMIN | Resolve or reject grievance with **mandatory resolution remarks**. Invalid status transitions are rejected server-side (`ALLOWED_TRANSITIONS` → 400 Bad Request). | `UpdateStatusRequest` (`status`, `resolutionRemarks`) |
+| `/api/grievances/{id}` | `GET` | Authenticated | View full grievance details with role-based privacy masking (full details for owner/officer/admin; masked projection for other authenticated users). | Path Variable `id` |
+| `/api/grievances/{id}/history` | `GET` | Authenticated | Retrieve audit history timeline (`grievance_history` rows: who, from-status, to-status, remarks, timestamp). | Path Variable `id` |
+| `/api/grievances/{id}/upvote` | `POST` | Authenticated | Toggle upvote on a grievance (toggles `hasUpvoted` + `upvoteCount` on the response). | Path Variable `id` |
+| `/api/grievances/{id}/close` | `PUT` | USER | Close / cancel own grievance (`CLOSED_BY_USER`). Requires the caller to own the grievance. | Path Variable `id`; optional `remarks` in body |
+| `/api/grievances/{id}` | `DELETE` | ADMIN | Delete grievance from system. | Path Variable `id` |
 
 ### 4.3 Dashboards & Analytics (`/api/dashboard`)
 | Endpoint | Method | Role | Response Payload |
@@ -94,16 +95,25 @@ On application startup, `com.grievance.config.DataInitializer` ensures the follo
 
 * **Administrator**:
   * Username: `admin12`
-  * Password: `admin1234`
+  * Password: `admin1234` (overridable via `demo.admin.password` property/env var)
   * Role: `ROLE_ADMIN`
-* **Department**:
-  * Name: `Public Works`
-  * Description: Infrastructure, civic works, and utilities.
-* **Grievance Officer**:
-  * Username: `officer1`
-  * Password: `officer1234`
-  * Role: `ROLE_OFFICER`
-  * Department: `Public Works`
+* **Seeded departments** (created only when the `dev` Spring profile is active):
+  * **Hostel & Accommodation** — hostel room issues, maintenance, accommodation complaints
+  * **Academics & Examinations** — academic issues, grade discrepancies, exam-related complaints
+  * **IT & Infrastructure** — WiFi, lab computers, classroom AV, campus infrastructure
+  * **Canteen & Mess** — food quality, hygiene, canteen/mess service complaints
+  * **Administration** — ID cards, certificates, fee receipts, general administrative complaints
+* **Grievance Officers** (one per department; password overridable via `demo.officer.password`):
+  * `officer1` — `officer1234` → Hostel & Accommodation (Hostel Warden)
+  * `officer2` — `officer1234` → Academics & Examinations (Exam Cell)
+  * `officer3` — `officer1234` → IT & Infrastructure (IT Support)
+  * `officer4` — `officer1234` → Canteen & Mess (Mess Supervisor)
+  * `officer5` — `officer1234` → Administration (Admin Office)
+* **Student accounts** — self-register normally; no default student account is seeded.
+
+> **Dev profile required for seeding.** On startup, `DataInitializer` creates these demo records only when the `dev` Spring profile is active. Existing accounts are *not* password-reset on restart; the initializer reassigns officers to their correct departments each startup so stale mappings are corrected.
+
+
 
 ---
 
