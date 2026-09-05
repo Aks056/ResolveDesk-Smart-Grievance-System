@@ -139,9 +139,8 @@ public class GrievanceService {
         
         List<Grievance> recentList;
         if (user.getRole() == com.grievance.enums.Role.ADMIN) {
-            recentList = grievanceRepository.findAllByOrderByCreatedAtDesc().stream()
-                    .limit(5)
-                    .collect(Collectors.toList());
+            recentList = grievanceRepository.findAllByOrderByCreatedAtDesc(Pageable.ofSize(5))
+                    .getContent();
         } else if (user.getRole() == com.grievance.enums.Role.OFFICER) {
             recentList = grievanceRepository.findByAssignedOfficerOrderByCreatedAtDesc(user).stream()
                     .limit(5)
@@ -169,7 +168,7 @@ public class GrievanceService {
             } else if ("RESOLVED".equalsIgnoreCase(scope) || "RESOLVED_HISTORY".equalsIgnoreCase(scope)) {
                 list = grievanceRepository.findByStatus(GrievanceStatus.RESOLVED);
             } else {
-                list = grievanceRepository.findAllByOrderByCreatedAtDesc();
+                list = grievanceRepository.findAllByOrderByCreatedAtDesc(Pageable.ofSize(100)).getContent();
             }
         } else {
             if (officer.getDepartment() == null) {
@@ -283,10 +282,9 @@ public class GrievanceService {
     }
 
     @Transactional(readOnly = true)
-    public List<GrievanceResponse> getAllGrievances() {
-        return grievanceRepository.findAllByOrderByCreatedAtDesc().stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
+    public Page<GrievanceResponse> getAllGrievances(Pageable pageable) {
+        log.info("Fetching all grievances - page: {}, size: {}", pageable.getPageNumber(), pageable.getPageSize());
+        return grievanceRepository.findAllByOrderByCreatedAtDesc(pageable).map(this::convertToResponse);
     }
 
     @Transactional(readOnly = true)
@@ -302,17 +300,15 @@ public class GrievanceService {
     }
 
     @Transactional(readOnly = true)
-    public List<GrievanceResponse> getGlobalGrievances(boolean maskNames) {
-        log.info("Fetching global grievances. Masking enabled: {}", maskNames);
-        return grievanceRepository.findAllByOrderByCreatedAtDesc().stream()
-                .map(g -> {
-                    GrievanceResponse res = convertToResponse(g);
-                    if (maskNames && res.getCitizenName() != null) {
-                        res.setCitizenName(maskName(res.getCitizenName()));
-                    }
-                    return res;
-                })
-                .collect(Collectors.toList());
+    public Page<GrievanceResponse> getGlobalGrievances(boolean maskNames, Pageable pageable) {
+        log.info("Fetching global grievances. Masking enabled: {}, page: {}, size: {}", maskNames, pageable.getPageNumber(), pageable.getPageSize());
+        return grievanceRepository.findAllByOrderByCreatedAtDesc(pageable).map(g -> {
+            GrievanceResponse res = convertToResponse(g);
+            if (maskNames && res.getCitizenName() != null) {
+                res.setCitizenName(maskName(res.getCitizenName()));
+            }
+            return res;
+        });
     }
 
     private String maskName(String name) {

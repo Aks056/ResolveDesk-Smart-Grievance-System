@@ -119,17 +119,30 @@ public class GrievanceController {
     // ================= ALL (Global Feed) =================
     @GetMapping("/all")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> getGlobalGrievances(Authentication authentication) {
+    public ResponseEntity<?> getGlobalGrievances(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            Authentication authentication) {
         boolean isAdminOrOfficer = authentication.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_OFFICER"));
-        return ResponseEntity.ok(grievanceService.getGlobalGrievances(!isAdminOrOfficer));
+        org.springframework.data.domain.Pageable pageable = 
+            org.springframework.data.domain.PageRequest.of(page, size);
+        org.springframework.data.domain.Page<GrievanceResponse> grievances = 
+            grievanceService.getGlobalGrievances(!isAdminOrOfficer, pageable);
+        return ResponseEntity.ok(grievances);
     }
 
     // ================= ADMIN ALL =================
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
-    public ResponseEntity<?> getAllGrievances() {
-        return ResponseEntity.ok(grievanceService.getAllGrievances());
+    public ResponseEntity<?> getAllGrievances(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        org.springframework.data.domain.Pageable pageable = 
+            org.springframework.data.domain.PageRequest.of(page, size);
+        org.springframework.data.domain.Page<GrievanceResponse> grievances = 
+            grievanceService.getAllGrievances(pageable);
+        return ResponseEntity.ok(grievances);
     }
 
     // ================= CLOSE BY USER =================

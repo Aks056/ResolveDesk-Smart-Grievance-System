@@ -9,6 +9,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -101,5 +104,5 @@ public interface GrievanceRepository extends JpaRepository<Grievance, Long> {
     List<Grievance> findTop5ByCitizenOrderByCreatedAtDesc(User citizen);
 
     // Find all grievances ordered by creation date
-    List<Grievance> findAllByOrderByCreatedAtDesc();
+    Page<Grievance> findAllByOrderByCreatedAtDesc(Pageable pageable);
 }

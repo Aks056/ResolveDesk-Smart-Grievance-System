@@ -3,6 +3,9 @@ package com.grievance.controller;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,7 +21,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.grievance.entity.Department;
+import com.grievance.repository.GrievanceRepository;
 import com.grievance.security.CustomUserDetails;
+import com.grievance.dto.response.GrievanceResponse;
 import com.grievance.service.DepartmentService;
 import com.grievance.service.GrievanceService;
 
@@ -32,9 +37,10 @@ import lombok.extern.slf4j.Slf4j;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
-    private DepartmentService departmentService;
-    private GrievanceService grievanceService;
-    private com.grievance.service.UserService userService;
+    private final DepartmentService departmentService;
+    private final GrievanceService grievanceService;
+    private final GrievanceRepository grievanceRepository;
+    private final com.grievance.service.UserService userService;
 
     @PostMapping("/departments")
     public ResponseEntity<?> createDepartment(@RequestBody Map<String, String> request) {
@@ -98,17 +104,22 @@ public class AdminController {
     @GetMapping("/statistics")
     public ResponseEntity<?> getAdminStatistics() {
         log.debug("Fetching admin statistics");
+        long totalGrievances = grievanceRepository.count();
         return ResponseEntity.ok(Map.of(
-                "totalGrievances", grievanceService.getAllGrievances().size(),
+                "totalGrievances", totalGrievances,
                 "totalDepartments", departmentService.getAllDepartments().size(),
                 "totalUsers", userService.countUsers()
         ));
     }
 
     @GetMapping("/grievances")
-    public ResponseEntity<?> getAllGrievances() {
-        log.info("Fetching all grievances for admin");
-        return ResponseEntity.ok(grievanceService.getAllGrievances());
+    public ResponseEntity<?> getAllGrievances(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        log.info("Fetching all grievances for admin - page: {}, size: {}", page, size);
+        Pageable pageable = PageRequest.of(page, size);
+        Page<GrievanceResponse> grievances = grievanceService.getAllGrievances(pageable);
+        return ResponseEntity.ok(grievances);
     }
 
     @GetMapping("/users")
