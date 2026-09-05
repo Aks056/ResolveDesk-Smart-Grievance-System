@@ -272,7 +272,7 @@ const RecentGrievancesPage = () => {
           <h2 className="text-4xl md:text-5xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/60">
             Recent Grievances
           </h2>
-          <p className="text-muted-foreground font-medium max-w-lg">Viewing real-time redressal activity across AKTU. Monitor, track, and review public issues.</p>
+          <p className="text-muted-foreground font-medium max-w-lg">Viewing real-time redressal activity across the campus. Monitor, track, and review public issues.</p>
         </div>
 
         {/* Global Toolbar */}
