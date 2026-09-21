@@ -36,8 +36,8 @@ application-prod.properties
 *.h2.db
 
 # File Uploads
-Backend/src/main/resources/static/uploads/*
-!Backend/src/main/resources/static/uploads/.gitkeep
+Backend/uploads/*
+!Backend/uploads/.gitkeep
 
 # Logs
 logs/

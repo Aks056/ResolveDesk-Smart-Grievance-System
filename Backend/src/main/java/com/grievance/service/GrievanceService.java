@@ -276,12 +276,6 @@ public class GrievanceService {
     }
 
     @Transactional(readOnly = true)
-    public Page<GrievanceResponse> searchGrievances(GrievanceStatus status, Priority priority, Pageable pageable) {
-        log.debug("Searching grievances - status: {}, priority: {}", status, priority);
-        return grievanceRepository.findAll(pageable).map(this::convertToResponse);
-    }
-
-    @Transactional(readOnly = true)
     public Page<GrievanceResponse> getAllGrievances(Pageable pageable) {
         log.info("Fetching all grievances - page: {}, size: {}", pageable.getPageNumber(), pageable.getPageSize());
         return grievanceRepository.findAllByOrderByCreatedAtDesc(pageable).map(this::convertToResponse);

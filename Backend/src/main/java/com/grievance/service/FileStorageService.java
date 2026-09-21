@@ -91,6 +91,9 @@ public class FileStorageService {
     private boolean isAllowedContentType(String contentType) {
         return "image/jpeg".equals(contentType)
             || "image/png".equals(contentType)
-            || "application/pdf".equals(contentType);
+            || "application/pdf".equals(contentType)
+            || "application/msword".equals(contentType)
+            || "application/vnd.openxmlformats-officedocument.wordprocessingml.document".equals(contentType)
+            || "text/plain".equals(contentType);
     }
 }
