@@ -4,9 +4,6 @@ import { logout } from '../store/authSlice';
 
 const api = axios.create({
   baseURL: '/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Request interceptor to attach JWT token
@@ -21,11 +18,28 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Request interceptor: keep multipart/form-data safe whenever a FormData body is sent.
+// Axios auto-generates the correct boundary, but only when Content-Type is not already
+// pinned to something else (e.g. a leftover global application/json default).
+api.interceptors.request.use(
+  (config) => {
+    if (config.data instanceof FormData) {
+      if (config.headers['Content-Type'] == null) {
+        delete config.headers['Content-Type'];
+      }
+      // If a consumer already set an explicit Content-Type, leave it untouched.
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+
 // Response interceptor to handle unauthorized errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+    if (error.response && error.response.status === 401) {
       store.dispatch(logout());
     }
     return Promise.reject(error);

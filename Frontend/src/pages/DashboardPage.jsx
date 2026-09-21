@@ -1,43 +1,70 @@
-import { useEffect, useState, useMemo } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import api from '../lib/api';
-import { 
-  Card, CardContent, CardDescription, CardHeader, CardTitle 
-} from "@/components/ui/card";
-import { 
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
-} from "@/components/ui/table";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { 
-  LayoutDashboard, Clock, CheckCircle2, AlertCircle, FileText, Plus, Bell, MoreHorizontal,
-  TrendingUp, TrendingDown, Layers, Building2, Ticket, ArrowRight, UserPlus, Search, Ghost,
-  AlertTriangle, X, UserCheck, ArrowUp, ArrowDown, ArrowUpDown, ThumbsUp
-} from "lucide-react";
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  LineChart, Line
-} from 'recharts';
-import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { cn } from "@/lib/utils";
+    Card, CardContent, CardDescription, CardHeader, CardTitle
+} from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { 
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
-  DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent 
-} from "@/components/ui/dropdown-menu";
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter
-} from "@/components/ui/sheet";
+    DropdownMenu,
+    DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
+    DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+    Sheet, SheetContent, SheetHeader, SheetTitle
+} from "@/components/ui/sheet";
+import {
+    Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import {
+    AlertCircle,
+    AlertTriangle,
+    ArrowDown,
+    ArrowRight,
+    ArrowUp,
+    ArrowUpDown,
+    Bell,
+    Building2,
+    CheckCircle2,
+    Clock,
+    Ghost,
+    MoreHorizontal,
+    Plus,
+    Search,
+    ThumbsUp,
+    TrendingUp,
+    UserCheck,
+    X
+} from "lucide-react";
+import { useEffect, useMemo, useState } from 'react';
+import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Legend,
+    Line,
+    LineChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis, YAxis
+} from 'recharts';
+import { toast } from "sonner";
+import api from '../lib/api';
+import { getOfficerName } from '../lib/privacy';
 
 
 const DashboardPage = () => {
   const { user } = useSelector((state) => state.auth);
-  const dispatch = useDispatch();
   const navigate = useNavigate();
   
   const [stats, setStats] = useState({ 
@@ -99,11 +126,10 @@ const DashboardPage = () => {
         const sortedRecent = (recentRes.data || []).sort((a, b) => parseDate(b.createdAt) - parseDate(a.createdAt));
         setRecentGrievances(sortedRecent);
 
-        // Fetch full grievances list based on user role to compute SLA breach & unassigned counts
-        let grievancesData = [];
+        // Fetch role-specific data for non-admin roles
         if (user?.role === 'ADMIN') {
-          const allRes = await api.get(`/grievances/all?t=${refreshKey}`);
-          grievancesData = allRes.data || [];
+          // Admin stats come from /dashboard/admin (already fetched above).
+          // Only the officers list is needed separately for the assignment dropdown.
           try {
             const officersRes = await api.get('/grievances/officers');
             setOfficers(officersRes.data || []);
@@ -112,12 +138,11 @@ const DashboardPage = () => {
           }
         } else if (user?.role === 'OFFICER') {
           const assignedRes = await api.get(`/grievances/assigned?t=${refreshKey}`);
-          grievancesData = assignedRes.data || [];
+          setAllGrievances(assignedRes.data || []);
         } else if (user) {
           const myRes = await api.get(`/grievances/my?t=${refreshKey}`);
-          grievancesData = myRes.data || [];
+          setAllGrievances(myRes.data || []);
         }
-        setAllGrievances(grievancesData);
       } catch (err) {
         console.error("Failed to fetch dashboard data", err);
       } finally {
@@ -127,39 +152,32 @@ const DashboardPage = () => {
     fetchData();
   }, [user, refreshKey]);
 
-  // Calculate SLA-breached (escalated) grievances and unassigned pending grievances
-  const SLA_LIMIT_MS = 48 * 60 * 60 * 1000; // 48 business/calendar hours
-  
-  const escalatedGrievances = useMemo(() => {
+  // SLA breach count and unassigned pending count.
+  // Admin: sourced from backend aggregate (stats.slaBreachedCount / stats.pendingGrievances)
+  // Officer/User: computed client-side from allGrievances (existing behavior)
+  const escalatedCount = useMemo(() => {
+    if (isAdmin) return stats.slaBreachedCount || 0;
+    const SLA_LIMIT_MS = 48 * 60 * 60 * 1000;
     return allGrievances.filter(g => {
       const isUnresolved = ['PENDING', 'ASSIGNED', 'IN_PROGRESS'].includes(g.status);
       const createdTime = parseDate(g.createdAt).getTime();
       return isUnresolved && (Date.now() - createdTime) > SLA_LIMIT_MS;
-    });
-  }, [allGrievances]);
-
-  const escalatedCount = escalatedGrievances.length;
+    }).length;
+  }, [isAdmin, stats.slaBreachedCount, allGrievances]);
 
   const unassignedPendingCount = useMemo(() => {
+    if (isAdmin) return stats.pendingGrievances || 0;
     return allGrievances.filter(g => g.status === 'PENDING' && !g.assignedOfficerId).length;
-  }, [allGrievances]);
+  }, [isAdmin, stats.pendingGrievances, allGrievances]);
 
-  // Display officers list with fallback dummy values if empty
-  const displayOfficers = useMemo(() => {
-    return officers.length > 0 ? officers : [
-      { id: 101, fullName: "Hostel Warden", departmentName: "Hostel & Accommodation" },
-      { id: 102, fullName: "Exam Cell", departmentName: "Academics & Examinations" },
-      { id: 103, fullName: "IT Support", departmentName: "IT & Infrastructure" },
-      { id: 104, fullName: "Mess Supervisor", departmentName: "Canteen & Mess" }
-    ];
-  }, [officers]);
+  const displayOfficers = officers;
 
   // Sort and Filter logic for the Recent Grievances table
   const processedGrievances = useMemo(() => {
     let result = recentGrievances.filter(g => 
-      g.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      g.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      g.departmentName.toLowerCase().includes(searchTerm.toLowerCase())
+      g.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      g.status?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      g.departmentName?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     if (sortField === 'date') {
@@ -222,7 +240,7 @@ const DashboardPage = () => {
   // Action Handlers from Table
   const handleToggleUpvote = async (grievanceId) => {
     const grievance = recentGrievances.find(g => g.id === grievanceId);
-    if (!grievance) return;
+    if (!grievance?.published || grievance.privateDetailsAvailable === false) return;
 
     const previouslyUpvoted = grievance.hasUpvoted || false;
     const previousCount = grievance.upvoteCount || 0;
@@ -305,7 +323,7 @@ const DashboardPage = () => {
         ...prev,
         status: 'ASSIGNED',
         assignedOfficerId: selectedAssigneeId,
-        assignedOfficerName: updatedOfficer ? updatedOfficer.fullName : prev.assignedOfficerName
+        assignedOfficerName: updatedOfficer ? getOfficerName(updatedOfficer) : prev.assignedOfficerName
       }));
       
       setRefreshKey(Date.now());
@@ -318,9 +336,21 @@ const DashboardPage = () => {
   };
 
 
-  // Department Workload Data — computed from allGrievances (active = not resolved/rejected/closed)
+  // Department Workload Data
+  // Admin: sourced from backend aggregate (stats.departmentStats with activeGrievanceCount)
+  // Non-admin: computed client-side from allGrievances (existing behavior)
   const deptColors = { 'Hostel & Accommodation': '#6366f1', 'Academics & Examinations': '#f59e0b', 'IT & Infrastructure': '#3b82f6', 'Canteen & Mess': '#ef4444', 'Administration': '#8b5cf6' };
   const departmentWorkloadData = useMemo(() => {
+    const fallbackColors = ['#6366f1','#10b981','#3b82f6','#f59e0b','#ef4444','#8b5cf6'];
+    if (isAdmin && stats.departmentStats) {
+      return Object.values(stats.departmentStats)
+        .map((dept, i) => ({
+          name: dept.departmentName,
+          active: dept.activeGrievanceCount || 0,
+          fill: deptColors[dept.departmentName] || fallbackColors[i % 6]
+        }))
+        .sort((a, b) => b.active - a.active);
+    }
     const activeStatuses = ['PENDING', 'ASSIGNED', 'IN_PROGRESS'];
     const counts = {};
     allGrievances.forEach(g => {
@@ -328,15 +358,28 @@ const DashboardPage = () => {
         counts[g.departmentName] = (counts[g.departmentName] || 0) + 1;
       }
     });
-    const fallbackColors = ['#6366f1','#10b981','#3b82f6','#f59e0b','#ef4444','#8b5cf6'];
     return Object.entries(counts)
       .map(([name, active], i) => ({ name, active, fill: deptColors[name] || fallbackColors[i % 6] }))
       .sort((a, b) => b.active - a.active);
-  }, [allGrievances]);
+  }, [isAdmin, stats.departmentStats, allGrievances]);
 
-  // Resolution Trend Data — computed from allGrievances over last 7 days
+  // Resolution Trend Data
+  // Admin: sourced from backend aggregates (dailyTrends = creation, dailyResolvedTrends = resolution)
+  // Non-admin: computed client-side from allGrievances (existing behavior)
   const resolutionTrendData = useMemo(() => {
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    if (isAdmin && stats.dailyTrends) {
+      const created = stats.dailyTrends || {};
+      const resolved = stats.dailyResolvedTrends || {};
+      return Object.keys(created).map(day => {
+        const d = new Date(day + 'T00:00:00');
+        return {
+          day: dayNames[d.getDay()],
+          created: created[day] || 0,
+          resolved: resolved[day] || 0,
+        };
+      });
+    }
     const days = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
@@ -347,18 +390,18 @@ const DashboardPage = () => {
     return days.map(({ date, label }) => {
       const dayStart = date.getTime();
       const dayEnd = dayStart + 86400000;
-      const created = allGrievances.filter(g => {
+      const createdCount = allGrievances.filter(g => {
         const t = parseDate(g.createdAt).getTime();
         return t >= dayStart && t < dayEnd;
       }).length;
-      const resolved = allGrievances.filter(g => {
+      const resolvedCount = allGrievances.filter(g => {
         if (g.status !== 'RESOLVED') return false;
         const t = parseDate(g.updatedAt || g.createdAt).getTime();
         return t >= dayStart && t < dayEnd;
       }).length;
-      return { day: label, created, resolved };
+      return { day: label, created: createdCount, resolved: resolvedCount };
     });
-  }, [allGrievances]);
+  }, [isAdmin, stats.dailyTrends, stats.dailyResolvedTrends, allGrievances]);
   // Chart Data
   const statusData = useMemo(() => [
     { name: 'Resolved', value: stats.resolvedGrievances || 0, color: '#22c55e' },
@@ -745,7 +788,7 @@ const DashboardPage = () => {
                 />
               </div>
               <Button variant="ghost" size="sm" className="hidden sm:flex text-primary hover:text-primary hover:bg-primary/5 font-bold shrink-0" onClick={() => navigate('/recent-grievances')}>
-                View All <ArrowRight className="ml-2 h-4 w-4" />
+                Community <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
           </CardHeader>
@@ -804,7 +847,7 @@ const DashboardPage = () => {
                           "group hover:bg-primary/[0.02] active:bg-primary/[0.05] transition-colors cursor-pointer",
                           g.priority === 'HIGH' && "bg-red-50/50 dark:bg-red-950/10 hover:bg-red-100/50 dark:hover:bg-red-950/20"
                         )}
-                        onClick={() => navigate(`/grievances/${g.id}`)}
+                        onClick={() => { if (g.privateDetailsAvailable !== false) navigate(`/grievances/${g.id}`); }}
                       >
                         {isAdmin && (
                           <TableCell className="pl-4" onClick={(e) => e.stopPropagation()}>
@@ -826,7 +869,7 @@ const DashboardPage = () => {
                         </TableCell>
                         <TableCell>{getPriorityBadge(g.priority)}</TableCell>
                         <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                          <Button
+                          {g.published && g.privateDetailsAvailable !== false ? <Button
                             variant="ghost"
                             size="sm"
                             className={cn(
@@ -836,10 +879,12 @@ const DashboardPage = () => {
                                 : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
                             )}
                             onClick={() => handleToggleUpvote(g.id)}
+                            aria-label={`Upvote: ${g.title}`}
+                            aria-pressed={Boolean(g.hasUpvoted)}
                           >
                             <ThumbsUp className={cn("h-3.5 w-3.5", g.hasUpvoted && "fill-current")} />
                             <span>{g.upvoteCount || 0}</span>
-                          </Button>
+                          </Button> : <span className="text-xs text-muted-foreground">Private</span>}
                         </TableCell>
                         <TableCell>{getStatusBadge(g.status)}</TableCell>
                         <TableCell className="text-right text-muted-foreground text-xs font-medium">
@@ -856,6 +901,7 @@ const DashboardPage = () => {
                                   setActiveQuickViewGrievance(g);
                                   setSelectedAssigneeId(g.assignedOfficerId?.toString() || "");
                                 }}
+                                disabled={g.privateDetailsAvailable === false}
                               >
                                 View
                               </Button>
@@ -866,7 +912,7 @@ const DashboardPage = () => {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-48 bg-card border">
-                                  <DropdownMenuItem onClick={() => navigate(`/grievances/${g.id}`)} className="cursor-pointer font-bold text-xs uppercase tracking-wider">
+                                  <DropdownMenuItem disabled={g.privateDetailsAvailable === false} onClick={() => navigate(`/grievances/${g.id}`)} className="cursor-pointer font-bold text-xs uppercase tracking-wider">
                                     Full Details
                                   </DropdownMenuItem>
                                   
@@ -882,7 +928,7 @@ const DashboardPage = () => {
                                             onClick={() => handleAssignOfficerFromTable(g.id, off.id)}
                                             className="cursor-pointer text-xs font-semibold"
                                           >
-                                            {off.fullName} ({off.departmentName || 'No Dept'})
+                                            {getOfficerName(off)} ({off.departmentName || 'No Dept'})
                                           </DropdownMenuItem>
                                         ))
                                       ) : (
@@ -999,7 +1045,7 @@ const DashboardPage = () => {
                   <SelectContent>
                     {displayOfficers.map(off => (
                       <SelectItem key={off.id} value={off.id.toString()} className="font-semibold text-xs cursor-pointer">
-                        {off.fullName} ({off.departmentName || 'No Dept'})
+                        {getOfficerName(off)} ({off.departmentName || 'No Dept'})
                       </SelectItem>
                     ))}
                   </SelectContent>

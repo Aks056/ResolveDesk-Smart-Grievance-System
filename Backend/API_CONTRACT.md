@@ -4,6 +4,11 @@
 > **Auth:** `/api/auth/**` is public. All other `/api/**` require JWT Bearer.
 > **Pagination:** 5 endpoints return `Page<T>` — see [Envelope](#paginated-response-envelope).
 
+> **Privacy:** Cases are private by default. Private details, evidence, history, and
+> feedback require the owning USER, assigned same-department OFFICER, or ADMIN.
+> Community endpoints expose only explicitly reviewed, published summaries.
+> See [Privacy Migration](PRIVACY_MIGRATION.md) for exact DTOs and required rollout steps.
+
 ---
 
 ## Enums
@@ -109,32 +114,33 @@ data JSON: {"title":"...","description":"...","departmentId":1,"priority":"HIGH"
 
 ### GET /api/grievances/recent
 **Auth:** Any authenticated
-**Response:** 200 OK - GrievanceResponse[] (5 most recent)
+**Response:** 200 OK - GrievanceResponse[] (at most 5 authorized cases: own for USER, assigned same-department for OFFICER, global for ADMIN)
 
 ---
 
 ### GET /api/grievances/{id}
-**Auth:** Any authenticated
+**Auth:** Owner USER, assigned same-department OFFICER, or ADMIN
 **Response:** 200 OK - GrievanceResponse
 
 ---
 
 ### GET /api/grievances/assigned
 **Auth:** ROLE_OFFICER or ROLE_ADMIN
-**Query:** scope=DEPT_POOL|MY_TASKS|RESOLVED (or omit for all)
-**Response:** 200 OK - GrievanceResponse[] (not paginated)
+**Query:** scope=DEPT_POOL|MY_TASKS|RESOLVED (omitted defaults to MY_TASKS; invalid/empty returns 400)
+**Response:** 200 OK - GrievanceResponse[] for authorized MY_TASKS/RESOLVED cases, or minimal GrievanceQueueResponse[] for DEPT_POOL. Pool entries do not grant private detail access.
 
 ---
 
 ### PUT /api/grievances/{id}/status
-**Auth:** ROLE_OFFICER or ROLE_ADMIN
-{"status":"RESOLVED","resolutionRemarks":"...","remarks":"Optional"}
+**Auth:** Assigned same-department OFFICER or ADMIN
+{"status":"RESOLVED","resolutionRemarks":"...","remarks":"Optional","visibility":"INTERNAL"}
 
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
 | status | GrievanceStatus | Yes | Valid transition |
 | resolutionRemarks | String | Cond | Required for RESOLVED/REJECTED |
 | remarks | String | No | Alternative to resolutionRemarks |
+| visibility | HistoryVisibility | No | INTERNAL by default; PARTICIPANTS explicitly shares with owner; PUBLIC rejected |
 
 **Response:** 200 OK - GrievanceResponse
 
@@ -148,14 +154,14 @@ data JSON: {"title":"...","description":"...","departmentId":1,"priority":"HIGH"
 
 ### GET /api/grievances/all - PAGINATED
 **Auth:** Any authenticated
-**Query:** page=0&size=10
-**Response:** 200 OK - Spring Page envelope
+**Query:** page=0&size=10 (page >= 0, size >= 1, size capped at 100)
+**Response:** 200 OK - Spring Page<PublicGrievanceResponse>, published summaries only
 > Read response.data.content as the array!
 
 ---
 
 ### GET /api/grievances - PAGINATED
-**Auth:** ROLE_OFFICER or ROLE_ADMIN
+**Auth:** ROLE_ADMIN
 **Response:** 200 OK - Spring Page envelope
 
 ---
@@ -174,13 +180,13 @@ data JSON: {"title":"...","description":"...","departmentId":1,"priority":"HIGH"
 ---
 
 ### GET /api/grievances/{id}/history
-**Auth:** Any authenticated
-**Response:** 200 OK - GrievanceHistoryResponse[]
+**Auth:** Private case access required
+**Response:** 200 OK - GrievanceHistoryResponse[]. Owners cannot see INTERNAL entries; legacy null visibility and internal markers fail closed.
 
 ---
 
 ### PUT /api/grievances/{id}/priority
-**Auth:** ROLE_OFFICER or ROLE_ADMIN
+**Auth:** Assigned same-department OFFICER or ADMIN
 **Query:** priority=LOW/MEDIUM/HIGH
 **Response:** 200 OK - GrievanceResponse
 
@@ -188,14 +194,37 @@ data JSON: {"title":"...","description":"...","departmentId":1,"priority":"HIGH"
 
 ### GET /api/grievances/officers
 **Auth:** ROLE_OFFICER or ROLE_ADMIN
-**Response:** 200 OK - UserResponse[]
+**Response:** 200 OK - OfficerDirectoryResponse[] (id, firstName, lastName, departmentId, departmentName only)
 
 ---
 
 ### POST /api/grievances/{id}/upvote
 **Auth:** Any authenticated
-Toggle upvote.
-**Response:** 200 OK - GrievanceResponse
+Toggle upvote on a published case only; unpublished cases return 404.
+**Response:** 200 OK - {upvoteCount, hasUpvoted}
+
+### GET /api/grievances/public/{publicId}
+**Auth:** Any authenticated
+**Response:** PublicGrievanceResponse; withdrawn or missing UUID returns 404.
+Fields: publicId, publicTitle, publicSummary, departmentName, status, createdDate,
+upvoteCount, hasUpvoted. No raw private text, identity, numeric case ID, or evidence.
+
+### POST /api/grievances/public/{publicId}/upvote
+**Auth:** Any authenticated
+**Response:** {upvoteCount, hasUpvoted}; published UUIDs only.
+
+### PUT /api/grievances/{id}/publication
+**Auth:** ROLE_ADMIN
+**Request:** {"published":true,"publicTitle":"Reviewed title","publicSummary":"Reviewed summary"}
+Publishing requires nonblank reviewed title (max 200) and summary (max 2000).
+Raw case text is never copied automatically. Send {"published":false} to withdraw.
+**Response:** Authorized private GrievanceResponse.
+
+### GET /api/grievances/{id}/attachments/evidence
+**Auth:** Private case access required
+**Response:** Authenticated binary download, attachment disposition, nosniff,
+private/no-store cache policy. No caller-supplied filename or path is accepted.
+Legacy /uploads URLs are denied; attachmentUrl and imageUrl now reference this endpoint.
 
 ---
 
@@ -228,8 +257,7 @@ Toggle upvote.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | /api/officer/assigned-grievances | My department grievances |
-| POST | /api/officer/grievances/{gId}/assign/{oId} | Reassign grievance |
+| GET | /api/officer/assigned-grievances | My assigned same-department grievances |
 
 ---
 
@@ -273,11 +301,11 @@ Toggle upvote.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | /api/feedback | USER | {grievanceId, rating(1-5), comments?} |
-| GET | /api/feedback/grievance/{id} | Any | FeedbackResponse[] |
+| POST | /api/feedback | Owner USER | {grievanceId, rating(1-5), comments?} |
+| GET | /api/feedback/grievance/{id} | Private case access | FeedbackResponse[] |
 | GET | /api/feedback/my | USER | My feedbacks |
-| GET | /api/feedback/grievance/{id}/rating | Any | Double (average) |
-| DELETE | /api/feedback/{id} | USER | 204 |
+| GET | /api/feedback/grievance/{id}/rating | Private case access | Double (average) |
+| DELETE | /api/feedback/{id} | Creator USER with case access | 204 |
 
 ---
 
@@ -287,8 +315,8 @@ Toggle upvote.
 
 | Endpoint | Description |
 |----------|-------------|
-| GET /api/grievances/all | Global feed (names masked for USER) |
-| GET /api/grievances | All grievances (ADMIN/OFFICER) |
+| GET /api/grievances/all | Published, reviewed summaries (PublicGrievanceResponse) |
+| GET /api/grievances | All private grievances (ADMIN) |
 | GET /api/admin/grievances | Admin grievance management |
 | GET /api/admin/users | Admin user management |
 | GET /api/user | User list (ADMIN) |
@@ -317,6 +345,7 @@ const currentPage = response.data.number;      // zero-based
 | 401 | Auth failed, missing/invalid token |
 | 403 | Insufficient permissions |
 | 404 | Resource not found |
+| 409 | Concurrent modification; reload and reconsider the operation |
 | 500 | Server error |
 
 fieldErrors only present for validation errors (400 on bad input).

@@ -1,10 +1,11 @@
 package com.grievance.service;
 
-import java.util.List;
-import java.util.UUID;
+import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.modelmapper.ModelMapper;
@@ -12,20 +13,25 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.io.IOException;
-
 import org.springframework.web.multipart.MultipartFile;
 
 import com.grievance.dto.request.GrievanceRequest;
+import com.grievance.dto.request.PublicationRequest;
 import com.grievance.dto.request.UpdateStatusRequest;
-import com.grievance.dto.response.GrievanceResponse;
 import com.grievance.dto.response.GrievanceHistoryResponse;
+import com.grievance.dto.response.GrievanceQueueResponse;
+import com.grievance.dto.response.GrievanceResponse;
+import com.grievance.dto.response.OfficerDirectoryResponse;
+import com.grievance.dto.response.PublicGrievanceResponse;
+import com.grievance.dto.response.UpvoteResponse;
 import com.grievance.entity.Grievance;
 import com.grievance.entity.GrievanceHistory;
+import com.grievance.entity.GrievanceUpvote;
 import com.grievance.entity.User;
 import com.grievance.enums.GrievanceStatus;
+import com.grievance.enums.HistoryVisibility;
 import com.grievance.enums.Priority;
+import com.grievance.enums.Role;
 import com.grievance.exception.BadRequestException;
 import com.grievance.exception.ResourceNotFoundException;
 import com.grievance.exception.UnauthorizedException;
@@ -33,9 +39,8 @@ import com.grievance.repository.DepartmentRepository;
 import com.grievance.repository.FeedbackRepository;
 import com.grievance.repository.GrievanceHistoryRepository;
 import com.grievance.repository.GrievanceRepository;
-import com.grievance.repository.UserRepository;
-import com.grievance.entity.GrievanceUpvote;
 import com.grievance.repository.GrievanceUpvoteRepository;
+import com.grievance.repository.UserRepository;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,10 +60,11 @@ public class GrievanceService {
     private FileStorageService fileStorageService;
     private ModelMapper modelMapper;
     private GrievanceUpvoteRepository upvoteRepository;
+    private GrievanceAccessPolicy accessPolicy;
     
     private static final Map<GrievanceStatus, Set<GrievanceStatus>> ALLOWED_TRANSITIONS = new HashMap<>();
     static {
-        ALLOWED_TRANSITIONS.put(GrievanceStatus.PENDING, Set.of(GrievanceStatus.ASSIGNED, GrievanceStatus.REJECTED));
+        ALLOWED_TRANSITIONS.put(GrievanceStatus.PENDING, Set.of(GrievanceStatus.ASSIGNED, GrievanceStatus.IN_PROGRESS, GrievanceStatus.REJECTED));
         ALLOWED_TRANSITIONS.put(GrievanceStatus.ASSIGNED, Set.of(GrievanceStatus.IN_PROGRESS, GrievanceStatus.REJECTED));
         ALLOWED_TRANSITIONS.put(GrievanceStatus.IN_PROGRESS, Set.of(GrievanceStatus.RESOLVED, GrievanceStatus.REJECTED));
         ALLOWED_TRANSITIONS.put(GrievanceStatus.RESOLVED, Set.of());
@@ -85,7 +91,7 @@ public class GrievanceService {
                 log.info("File uploaded successfully: {}", attachmentUrl);
             } catch (IOException e) {
                 log.error("Error uploading file: {}", e.getMessage());
-                throw new RuntimeException("Failed to upload file: " + e.getMessage());
+                throw new RuntimeException("Failed to upload evidence");
             }
         }
 
@@ -109,33 +115,27 @@ public class GrievanceService {
     }
 
     @Transactional(readOnly = true)
-    public GrievanceResponse getGrievanceDetails(Long grievanceId, Long requesterId, boolean isAdminOrOfficer) {
+    public GrievanceResponse getGrievanceDetails(Long grievanceId, Long requesterId) {
         Grievance grievance = grievanceRepository.findById(grievanceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
         
-        GrievanceResponse res = convertToResponse(grievance);
-        
-        // Privacy: Mask name if requester is neither owner nor admin/officer
-        if (!isAdminOrOfficer && !java.util.Objects.equals(grievance.getCitizen().getId(), requesterId)) {
-            res.setCitizenName(maskName(res.getCitizenName()));
-        }
-        
-        return res;
+        accessPolicy.requireRead(grievance, accessPolicy.requester(requesterId));
+        return convertToResponse(grievance);
     }
 
     @Transactional(readOnly = true)
     public List<GrievanceResponse> getUserGrievances(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+        User user = accessPolicy.requester(userId);
+        if (user.getRole() != Role.USER) throw new org.springframework.security.access.AccessDeniedException("Citizen access required");
         return grievanceRepository.findByCitizenOrderByCreatedAtDesc(user).stream()
+            .filter(grievance -> accessPolicy.canRead(grievance, user))
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<GrievanceResponse> getRecentGrievances(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+        User user = accessPolicy.requester(userId);
         
         List<Grievance> recentList;
         if (user.getRole() == com.grievance.enums.Role.ADMIN) {
@@ -143,6 +143,7 @@ public class GrievanceService {
                     .getContent();
         } else if (user.getRole() == com.grievance.enums.Role.OFFICER) {
             recentList = grievanceRepository.findByAssignedOfficerOrderByCreatedAtDesc(user).stream()
+                    .filter(grievance -> accessPolicy.canRead(grievance, user))
                     .limit(5)
                     .collect(Collectors.toList());
         } else {
@@ -150,14 +151,21 @@ public class GrievanceService {
         }
 
         return recentList.stream()
+            .filter(grievance -> accessPolicy.canRead(grievance, user))
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public List<GrievanceResponse> getOfficerDepartmentGrievances(Long officerId, String scope) {
-        User officer = userRepository.findById(officerId)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "id", officerId));
+    public List<?> getOfficerDepartmentGrievances(Long officerId, String scope) {
+        User officer = accessPolicy.requester(officerId);
+        scope = scope == null ? "MY_TASKS" : scope.toUpperCase(java.util.Locale.ROOT);
+        if (!Set.of("MY_TASKS", "DEPT_POOL", "RESOLVED").contains(scope)) {
+            throw new BadRequestException("Invalid scope: expected MY_TASKS, DEPT_POOL or RESOLVED");
+        }
+        if (officer.getRole() != Role.ADMIN && officer.getRole() != Role.OFFICER) {
+            throw new org.springframework.security.access.AccessDeniedException("Staff access required");
+        }
 
         List<Grievance> list;
         if (officer.getRole() == com.grievance.enums.Role.ADMIN) {
@@ -165,7 +173,7 @@ public class GrievanceService {
                 list = grievanceRepository.findActiveGrievancesByOfficer(officerId);
             } else if ("DEPT_POOL".equalsIgnoreCase(scope)) {
                 list = grievanceRepository.findPendingGrievances();
-            } else if ("RESOLVED".equalsIgnoreCase(scope) || "RESOLVED_HISTORY".equalsIgnoreCase(scope)) {
+            } else if ("RESOLVED".equalsIgnoreCase(scope)) {
                 list = grievanceRepository.findByStatus(GrievanceStatus.RESOLVED);
             } else {
                 list = grievanceRepository.findAllByOrderByCreatedAtDesc(Pageable.ofSize(100)).getContent();
@@ -179,21 +187,40 @@ public class GrievanceService {
                 list = grievanceRepository.findDeptPoolGrievances(deptId);
             } else if ("MY_TASKS".equalsIgnoreCase(scope)) {
                 list = grievanceRepository.findActiveGrievancesByOfficer(officerId);
-            } else if ("RESOLVED".equalsIgnoreCase(scope) || "RESOLVED_HISTORY".equalsIgnoreCase(scope)) {
+            } else if ("RESOLVED".equalsIgnoreCase(scope)) {
                 list = grievanceRepository.findResolvedGrievancesByOfficer(officerId);
             } else {
                 list = grievanceRepository.findByDepartment_IdOrderByCreatedAtDesc(deptId);
             }
         }
 
+        if ("DEPT_POOL".equals(scope)) {
+            return list.stream()
+                .filter(grievance -> (officer.getRole() == Role.ADMIN || accessPolicy.sameDepartment(grievance, officer))
+                    && grievance.getAssignedOfficer() == null)
+                .map(grievance -> new GrievanceQueueResponse(grievance.getId(), "Private grievance",
+                    grievance.getDepartment().getId(), grievance.getDepartment().getName(),
+                    grievance.getStatus(), grievance.getPriority(), grievance.getCreatedAt(), false))
+                .toList();
+        }
         return list.stream()
+            .filter(grievance -> accessPolicy.canRead(grievance, officer))
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<GrievanceResponse> getAssignedGrievances(Long officerId) {
-        return getOfficerDepartmentGrievances(officerId, null);
+        return getOfficerDepartmentGrievances(officerId, "MY_TASKS").stream()
+                .map(GrievanceResponse.class::cast).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public org.springframework.core.io.Resource getEvidence(Long grievanceId, Long requesterId) {
+        Grievance grievance = grievanceRepository.findById(grievanceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
+        accessPolicy.requireRead(grievance, accessPolicy.requester(requesterId));
+        return fileStorageService.loadEvidence(grievance.getAttachmentUrl());
     }
 
     public GrievanceResponse updateStatus(Long grievanceId, Long officerId, UpdateStatusRequest request) {
@@ -203,17 +230,10 @@ public class GrievanceService {
         Grievance grievance = grievanceRepository.findById(grievanceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
 
-        User officer = userRepository.findById(officerId)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "id", officerId));
-
-        boolean isAdmin = officer.getRole() == com.grievance.enums.Role.ADMIN;
-        if (!isAdmin) {
-            if (officer.getDepartment() == null || !grievance.getDepartment().getId().equals(officer.getDepartment().getId())) {
-                throw new UnauthorizedException("You cannot modify grievances outside your assigned department");
-            }
-            if (grievance.getAssignedOfficer() == null || !grievance.getAssignedOfficer().getId().equals(officerId)) {
-                throw new UnauthorizedException("Only the assigned officer or an administrator can update this grievance");
-            }
+        User officer = accessPolicy.requester(officerId);
+        accessPolicy.requireStaff(grievance, officer);
+        if (request.getVisibility() == HistoryVisibility.PUBLIC) {
+            throw new BadRequestException("Public remarks require a separate publication review");
         }
 
         // Validate status transition
@@ -235,6 +255,9 @@ public class GrievanceService {
                 .oldStatus(oldStatus)
                 .newStatus(request.getStatus())
                 .remarks(remarks.isEmpty() ? "Status updated to " + request.getStatus() : remarks)
+                .visibility(request.getVisibility() == HistoryVisibility.PARTICIPANTS
+                    && !remarks.toUpperCase(java.util.Locale.ROOT).contains("[INTERNAL]")
+                    ? HistoryVisibility.PARTICIPANTS : HistoryVisibility.INTERNAL)
                 .updatedByUser(officer)
                 .build();
 
@@ -249,6 +272,8 @@ public class GrievanceService {
 
     public GrievanceResponse assignGrievanceToOfficer(Long grievanceId, Long officerId, Long adminId) {
         log.info("Assigning grievance {} to officer {}", grievanceId, officerId);
+        User admin = accessPolicy.requester(adminId);
+        accessPolicy.requireAdmin(admin);
 
         Grievance grievance = grievanceRepository.findById(grievanceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
@@ -256,16 +281,35 @@ public class GrievanceService {
         User officer = userRepository.findById(officerId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", officerId));
 
+        // Department scope: target officer must belong to the grievance's department
+        if (officer.getRole() != Role.OFFICER || !Boolean.TRUE.equals(officer.getIsActive())) {
+            throw new BadRequestException("Target must be an active officer");
+        }
+        if (officer.getDepartment() == null) {
+            throw new BadRequestException("Officer " + officer.getFullName() + " does not belong to any department and cannot be assigned this grievance");
+        }
+        if (!grievance.getDepartment().getId().equals(officer.getDepartment().getId())) {
+            throw new BadRequestException("Officer " + officer.getFullName() + " does not belong to the "
+                    + grievance.getDepartment().getName() + " department and cannot be assigned this grievance");
+        }
+
+        // Validate status transition (same pattern as acceptGrievance/updateStatus)
+        if (!ALLOWED_TRANSITIONS.getOrDefault(grievance.getStatus(), Set.of()).contains(GrievanceStatus.ASSIGNED)) {
+            throw new BadRequestException("Cannot change status from " + grievance.getStatus() + " to " + GrievanceStatus.ASSIGNED);
+        }
+
+        // Capture real old status BEFORE mutating, so history reflects the actual prior state
+        GrievanceStatus oldStatus = grievance.getStatus();
         grievance.setAssignedOfficer(officer);
         grievance.setStatus(GrievanceStatus.ASSIGNED);
         Grievance updatedGrievance = grievanceRepository.save(grievance);
 
-        User admin = userRepository.findById(adminId).orElse(null);
         GrievanceHistory history = GrievanceHistory.builder()
                 .grievance(updatedGrievance)
-                .oldStatus(GrievanceStatus.PENDING)
+                .oldStatus(oldStatus)
                 .newStatus(GrievanceStatus.ASSIGNED)
                 .remarks("Assigned to officer: " + officer.getFullName())
+                .visibility(HistoryVisibility.PARTICIPANTS)
                 .updatedByUser(admin)
                 .build();
 
@@ -277,6 +321,7 @@ public class GrievanceService {
 
     @Transactional(readOnly = true)
     public Page<GrievanceResponse> getAllGrievances(Pageable pageable) {
+        accessPolicy.requireAdmin(accessPolicy.currentRequester());
         log.info("Fetching all grievances - page: {}, size: {}", pageable.getPageNumber(), pageable.getPageSize());
         return grievanceRepository.findAllByOrderByCreatedAtDesc(pageable).map(this::convertToResponse);
     }
@@ -294,29 +339,54 @@ public class GrievanceService {
     }
 
     @Transactional(readOnly = true)
-    public Page<GrievanceResponse> getGlobalGrievances(boolean maskNames, Pageable pageable) {
-        log.info("Fetching global grievances. Masking enabled: {}, page: {}, size: {}", maskNames, pageable.getPageNumber(), pageable.getPageSize());
-        return grievanceRepository.findAllByOrderByCreatedAtDesc(pageable).map(g -> {
-            GrievanceResponse res = convertToResponse(g);
-            if (maskNames && res.getCitizenName() != null) {
-                res.setCitizenName(maskName(res.getCitizenName()));
-            }
-            return res;
-        });
+    public Page<PublicGrievanceResponse> getGlobalGrievances(Long requesterId, Pageable pageable) {
+        User requester = accessPolicy.requester(requesterId);
+        Pageable bounded = org.springframework.data.domain.PageRequest.of(pageable.getPageNumber(), Math.min(pageable.getPageSize(), 100));
+        return grievanceRepository.findByPublishedTrueOrderByCreatedAtDesc(bounded)
+                .map(grievance -> publicResponse(grievance, requester.getId()));
     }
 
-    private String maskName(String name) {
-        if (name == null || name.isEmpty()) return "Anonymous";
-        String[] parts = name.split(" ");
-        StringBuilder sb = new StringBuilder();
-        for (String part : parts) {
-            if (part.length() > 1) {
-                sb.append(part.charAt(0)).append("*** ");
-            } else {
-                sb.append(part).append(" ");
-            }
+    private PublicGrievanceResponse publicResponse(Grievance grievance, Long requesterId) {
+        return new PublicGrievanceResponse(grievance.getPublicId(), grievance.getPublicTitle(), grievance.getPublicSummary(),
+                grievance.getDepartment().getName(), grievance.getStatus(),
+                grievance.getCreatedAt() == null ? null : grievance.getCreatedAt().toLocalDate(),
+                upvoteRepository.countByGrievanceId(grievance.getId()),
+                upvoteRepository.existsByGrievanceIdAndUserId(grievance.getId(), requesterId));
+    }
+
+    @Transactional(readOnly = true)
+    public PublicGrievanceResponse getPublicGrievance(String publicId, Long requesterId) {
+        accessPolicy.requester(requesterId);
+        return publicResponse(publishedGrievance(publicId), requesterId);
+    }
+
+    private Grievance publishedGrievance(String publicId) {
+        return grievanceRepository.findByPublicIdAndPublishedTrue(publicId)
+                .orElseThrow(() -> new ResourceNotFoundException("Published grievance", "publicId", publicId));
+    }
+
+    public UpvoteResponse togglePublicUpvote(String publicId, Long requesterId) {
+        return toggleUpvote(publishedGrievance(publicId).getId(), requesterId);
+    }
+
+    public GrievanceResponse updatePublication(Long grievanceId, Long requesterId, PublicationRequest request) {
+        accessPolicy.requireAdmin(accessPolicy.requester(requesterId));
+        if (request.published() == null) throw new BadRequestException("Published is required");
+        if ((request.publicTitle() != null && request.publicTitle().length() > 200)
+                || (request.publicSummary() != null && request.publicSummary().length() > 2000)) {
+            throw new BadRequestException("Public title or summary exceeds its maximum length");
         }
-        return sb.toString().trim();
+        if (request.published() && (request.publicTitle() == null || request.publicTitle().isBlank()
+                || request.publicSummary() == null || request.publicSummary().isBlank())) {
+            throw new BadRequestException("Reviewed public title and summary are required to publish");
+        }
+        Grievance grievance = grievanceRepository.findById(grievanceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
+        grievance.setPublished(request.published());
+        grievance.setPublicTitle(request.publicTitle());
+        grievance.setPublicSummary(request.publicSummary());
+        if (request.published() && grievance.getPublicId() == null) grievance.setPublicId(UUID.randomUUID().toString());
+        return convertToResponse(grievanceRepository.save(grievance));
     }
 
     private GrievanceResponse convertToResponse(Grievance grievance) {
@@ -337,10 +407,12 @@ public class GrievanceService {
     Double avgRating = feedbackRepository.getAverageRatingForGrievance(grievance);
     response.setAverageRating(avgRating);
 
-    // Populate imageUrl from attachmentUrl if present
-    if (grievance.getAttachmentUrl() != null) {
-        response.setImageUrl("/" + grievance.getAttachmentUrl());
-    }
+    String evidenceUrl = grievance.getAttachmentUrl() == null || grievance.getAttachmentUrl().isBlank()
+            ? null : "/api/grievances/" + grievance.getId() + "/attachments/evidence";
+    response.setAttachmentUrl(evidenceUrl);
+    response.setImageUrl(evidenceUrl);
+    response.setPublished(Boolean.TRUE.equals(grievance.getPublished()));
+    response.setPrivateDetailsAvailable(true);
 
     // Upvote data
     int upvoteCount = upvoteRepository.countByGrievanceId(grievance.getId());
@@ -369,14 +441,16 @@ private Long getCurrentUserId() {
     return null;
 }
 
-public GrievanceResponse toggleUpvote(Long grievanceId, Long userId) {
+public UpvoteResponse toggleUpvote(Long grievanceId, Long userId) {
     log.info("Toggling upvote on grievance ID: {} for user ID: {}", grievanceId, userId);
     
     Grievance grievance = grievanceRepository.findById(grievanceId)
             .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
             
-    User user = userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+    if (!Boolean.TRUE.equals(grievance.getPublished())) {
+        throw new ResourceNotFoundException("Published grievance", "id", grievanceId);
+    }
+    User user = accessPolicy.requester(userId);
             
     java.util.Optional<GrievanceUpvote> existingUpvote = 
             upvoteRepository.findByGrievanceIdAndUserId(grievanceId, userId);
@@ -393,11 +467,16 @@ public GrievanceResponse toggleUpvote(Long grievanceId, Long userId) {
         log.info("Added upvote for grievance {} by user {}", grievanceId, userId);
     }
     
-    return convertToResponse(grievance);
+    upvoteRepository.flush();
+    return new UpvoteResponse(upvoteRepository.countByGrievanceId(grievanceId), existingUpvote.isEmpty());
 }
 public void closeByUser(Long grievanceId, Long userId, String remarks) {
     Grievance grievance = grievanceRepository.findById(grievanceId)
         .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
+
+    User requester = accessPolicy.requester(userId);
+    accessPolicy.requireRead(grievance, requester);
+    if (requester.getRole() != Role.USER) throw new org.springframework.security.access.AccessDeniedException("Citizen access required");
 
     log.info("[AUTH-TRACE] Author ID: {} | Requestor ID: {} | Types: {} / {}", 
         grievance.getCitizen().getId(), userId, 
@@ -433,12 +512,15 @@ public void closeByUser(Long grievanceId, Long userId, String remarks) {
             .oldStatus(oldStatus)
             .newStatus(GrievanceStatus.CLOSED_BY_USER)
             .remarks(remarks != null ? remarks : "Closed by user via portal")
+            .visibility(HistoryVisibility.PARTICIPANTS)
             .updatedByUser(citizen)
             .build();
     
     try {
         historyRepository.save(history);
         log.info("Grievance {} successfully closed and history archived.", grievanceId);
+    } catch (org.springframework.dao.OptimisticLockingFailureException | jakarta.persistence.OptimisticLockException ex) {
+        throw ex;
     } catch (Exception e) {
         log.error("Failed to save grievance history for {}: {}", grievanceId, e.getMessage());
         throw new RuntimeException("Database error: Could not archive status transition.");
@@ -447,11 +529,13 @@ public void closeByUser(Long grievanceId, Long userId, String remarks) {
 
 // ✅ ACCEPT GRIEVANCE BY OFFICER (Claim unassigned department grievance and start progress)
 public GrievanceResponse acceptGrievance(Long grievanceId, Long officerId) {
-    Grievance grievance = grievanceRepository.findById(grievanceId)
+    Grievance grievance = grievanceRepository.findByIdForClaim(grievanceId)
             .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
 
-    User officer = userRepository.findById(officerId)
-            .orElseThrow(() -> new ResourceNotFoundException("User", "id", officerId));
+    User officer = accessPolicy.requester(officerId);
+    if (officer.getRole() != Role.ADMIN && officer.getRole() != Role.OFFICER) {
+        throw new org.springframework.security.access.AccessDeniedException("Staff access required");
+    }
 
     if (officer.getRole() != com.grievance.enums.Role.ADMIN) {
         if (officer.getDepartment() == null) {
@@ -484,6 +568,7 @@ public GrievanceResponse acceptGrievance(Long grievanceId, Long officerId) {
             .oldStatus(oldStatus)
             .newStatus(GrievanceStatus.IN_PROGRESS)
             .remarks("Accepted and taken up by officer: " + officer.getFullName())
+            .visibility(HistoryVisibility.PARTICIPANTS)
             .updatedByUser(officer)
             .build();
     historyRepository.save(history);
@@ -495,7 +580,10 @@ public GrievanceResponse acceptGrievance(Long grievanceId, Long officerId) {
 public List<GrievanceHistoryResponse> getGrievanceHistory(Long grievanceId) {
     Grievance grievance = grievanceRepository.findById(grievanceId)
             .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
-    return historyRepository.findByGrievanceOrderByUpdatedAtDesc(grievance).stream()
+        User requester = accessPolicy.currentRequester();
+        accessPolicy.requireRead(grievance, requester);
+        return historyRepository.findByGrievanceOrderByUpdatedAtDesc(grievance).stream()
+            .filter(history -> requester.getRole() != Role.USER || history.getEffectiveVisibility() != HistoryVisibility.INTERNAL)
             .map(this::convertHistoryToResponse)
             .collect(Collectors.toList());
 }
@@ -505,6 +593,7 @@ private GrievanceHistoryResponse convertHistoryToResponse(GrievanceHistory histo
             .id(history.getId())
             .status(history.getNewStatus().toString())
             .remarks(history.getRemarks())
+            .visibility(history.getEffectiveVisibility())
             .updatedBy(history.getUpdatedByUser() != null ? history.getUpdatedByUser().getFullName() : "System")
             .updatedAt(history.getUpdatedAt())
             .build();
@@ -515,6 +604,9 @@ public GrievanceResponse updatePriority(Long grievanceId, Priority priority) {
     Grievance grievance = grievanceRepository.findById(grievanceId)
             .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
 
+    User requester = accessPolicy.currentRequester();
+    accessPolicy.requireStaff(grievance, requester);
+    if (priority == null) throw new BadRequestException("Priority is required");
     Priority oldPriority = grievance.getPriority();
     grievance.setPriority(priority);
     Grievance saved = grievanceRepository.save(grievance);
@@ -524,6 +616,7 @@ public GrievanceResponse updatePriority(Long grievanceId, Priority priority) {
             .oldStatus(saved.getStatus())
             .newStatus(saved.getStatus())
             .remarks("Priority updated from " + oldPriority + " to " + priority)
+            .updatedByUser(requester)
             .build();
     historyRepository.save(history);
 
@@ -531,10 +624,16 @@ public GrievanceResponse updatePriority(Long grievanceId, Priority priority) {
 }
 
 @Transactional(readOnly = true)
-public List<com.grievance.dto.response.UserResponse> getAllOfficers() {
+public List<OfficerDirectoryResponse> getAllOfficers() {
+    User requester = accessPolicy.currentRequester();
+    if (requester.getRole() != Role.ADMIN && requester.getRole() != Role.OFFICER) {
+        throw new org.springframework.security.access.AccessDeniedException("Staff access required");
+    }
     log.info("Fetching all officers");
     return userRepository.findByRole(com.grievance.enums.Role.OFFICER).stream()
-            .map(user -> modelMapper.map(user, com.grievance.dto.response.UserResponse.class))
+                .map(user -> new OfficerDirectoryResponse(user.getId(), user.getFirstName(), user.getLastName(),
+                    user.getDepartment() == null ? null : user.getDepartment().getId(),
+                    user.getDepartment() == null ? null : user.getDepartment().getName()))
             .collect(Collectors.toList());
 }
 }

@@ -1,20 +1,23 @@
 package com.grievance.repository;
 
-import com.grievance.entity.Grievance;
-import com.grievance.entity.User;
-import com.grievance.enums.GrievanceStatus;
-import com.grievance.enums.Priority;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import com.grievance.entity.Grievance;
+import com.grievance.entity.User;
+import com.grievance.enums.GrievanceStatus;
+import com.grievance.enums.Priority;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
+import jakarta.persistence.LockModeType;
 
 /**
  * Repository for Grievance entity.
@@ -22,6 +25,14 @@ import java.util.Optional;
  */
 @Repository
 public interface GrievanceRepository extends JpaRepository<Grievance, Long> {
+
+    Page<Grievance> findByPublishedTrueOrderByCreatedAtDesc(Pageable pageable);
+
+    Optional<Grievance> findByPublicIdAndPublishedTrue(String publicId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT grievance FROM Grievance grievance WHERE grievance.id = :id")
+    Optional<Grievance> findByIdForClaim(@Param("id") Long id);
 
     // Find by grievance number
     Optional<Grievance> findByGrievanceNumber(String grievanceNumber);
@@ -105,4 +116,18 @@ public interface GrievanceRepository extends JpaRepository<Grievance, Long> {
 
     // Find all grievances ordered by creation date
     Page<Grievance> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    // ================= ADMIN DASHBOARD QUERIES =================
+
+    // Non-terminal grievances (for SLA breach computation across all departments)
+    @Query("SELECT g FROM Grievance g WHERE g.status NOT IN ('RESOLVED', 'REJECTED', 'CLOSED_BY_USER')")
+    List<Grievance> findNonTerminalGrievances();
+
+    // Active (non-terminal) grievance count per department (for Department Workload chart)
+    @Query("SELECT COUNT(g) FROM Grievance g WHERE g.department.id = :deptId AND g.status NOT IN ('RESOLVED', 'REJECTED', 'CLOSED_BY_USER')")
+    long countNonTerminalByDepartment(@Param("deptId") Long deptId);
+
+    // Resolved/rejected grievances within a date range (for resolution trend chart)
+    @Query("SELECT g FROM Grievance g WHERE g.status IN ('RESOLVED', 'REJECTED') AND g.updatedAt >= :startDate AND g.updatedAt <= :endDate")
+    List<Grievance> findResolvedByDateRange(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 }

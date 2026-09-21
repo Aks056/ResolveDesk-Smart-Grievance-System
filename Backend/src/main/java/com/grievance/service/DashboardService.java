@@ -139,8 +139,19 @@ public class DashboardService {
         long rejectedCount = grievanceRepository.countByStatus(GrievanceStatus.REJECTED);
         long closedByUserCount = grievanceRepository.countByStatus(GrievanceStatus.CLOSED_BY_USER);
 
+        // SLA breach count: non-terminal grievances whose elapsed time exceeds their SLA window.
+        // Reuses the same per-priority SLA logic as the officer dashboard.
+        long slaBreachedCount = grievanceRepository.findNonTerminalGrievances().stream()
+                .filter(g -> {
+                    int days = g.getResolutionDays() != null ? g.getResolutionDays()
+                            : (g.getPriority() != null ? g.getPriority().getResolutionDays() : 3);
+                    return g.getCreatedAt().plusDays(days).isBefore(LocalDateTime.now());
+                })
+                .count();
+
         Map<String, DashboardResponse.DepartmentStats> deptStats = getDepartmentStatistics();
         Map<String, Long> dailyTrends = calculateDailyTrends();
+        Map<String, Long> dailyResolvedTrends = calculateDailyResolvedTrends();
         Map<String, Long> weeklyTrends = calculateWeeklyTrends();
         Map<String, Long> monthlyTrends = calculateMonthlyTrends();
 
@@ -154,8 +165,10 @@ public class DashboardService {
                 .resolvedGrievances(resolvedCount)
                 .rejectedGrievances(rejectedCount)
                 .closedByUserGrievances(closedByUserCount)
+                .slaBreachedCount(slaBreachedCount)
                 .departmentStats(deptStats)
                 .dailyTrends(dailyTrends)
+                .dailyResolvedTrends(dailyResolvedTrends)
                 .weeklyTrends(weeklyTrends)
                 .monthlyTrends(monthlyTrends)
                 .build();
@@ -173,6 +186,8 @@ public class DashboardService {
                     .filter(g -> g.getStatus() == GrievanceStatus.RESOLVED)
                     .count();
 
+            long activeCount = grievanceRepository.countNonTerminalByDepartment(dept.getId());
+
             Double avgRating = feedbackRepository.getAverageRatingByDepartment(dept.getId());
             Double avgResolutionTime = grievanceRepository.getAverageResolutionTimeByDepartment(dept.getId());
 
@@ -181,6 +196,7 @@ public class DashboardService {
                     .departmentName(dept.getName())
                     .grievanceCount(grievanceCount)
                     .resolvedCount(resolvedCount)
+                    .activeGrievanceCount(activeCount)
                     .averageRating(avgRating != null ? avgRating : 0.0)
                     .averageResolutionTime(avgResolutionTime != null ? avgResolutionTime : 0.0)
                     .build();
@@ -202,6 +218,22 @@ public class DashboardService {
             List<Grievance> dayGrievances = grievanceRepository.findByDateRange(dayStart, dayEnd);
             String dayKey = dayStart.toLocalDate().toString();
             trends.put(dayKey, (long) dayGrievances.size());
+        }
+
+        return trends;
+    }
+
+    private Map<String, Long> calculateDailyResolvedTrends() {
+        Map<String, Long> trends = new HashMap<>();
+        LocalDateTime today = LocalDateTime.now().truncatedTo(ChronoUnit.DAYS);
+
+        for (int i = 6; i >= 0; i--) {
+            LocalDateTime dayStart = today.minusDays(i);
+            LocalDateTime dayEnd = dayStart.plusDays(1);
+
+            List<Grievance> dayResolved = grievanceRepository.findResolvedByDateRange(dayStart, dayEnd);
+            String dayKey = dayStart.toLocalDate().toString();
+            trends.put(dayKey, (long) dayResolved.size());
         }
 
         return trends;

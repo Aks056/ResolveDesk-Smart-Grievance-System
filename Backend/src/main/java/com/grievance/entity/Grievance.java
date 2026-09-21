@@ -24,6 +24,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -49,6 +50,10 @@ public class Grievance {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    @Column(nullable = false, columnDefinition = "bigint default 0")
+    private long version;
+
     @Column(nullable = false, unique = true, length = 20)
     private String grievanceNumber;
 
@@ -69,6 +74,19 @@ public class Grievance {
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String description;
+
+    @Column(columnDefinition = "boolean default false")
+    @Builder.Default
+    private Boolean published = false;
+
+    @Column(unique = true, length = 36)
+    private String publicId;
+
+    @Column(length = 200)
+    private String publicTitle;
+
+    @Column(length = 2000)
+    private String publicSummary;
 
     @Column(length = 500)
     private String attachmentUrl;

@@ -1,34 +1,51 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useSelector } from 'react-redux';
-import { 
-  getOfficerDashboardStats, 
-  getAssignedGrievances, 
-  acceptGrievance, 
-  updateGrievanceStatus 
-} from '../lib/api';
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { 
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
+import {
+    Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter
+    Sheet, SheetContent,
+    SheetDescription, SheetFooter,
+    SheetHeader, SheetTitle
 } from "@/components/ui/sheet";
-import { toast } from "sonner";
-import { 
-  Inbox, Clock, CheckCircle2, AlertTriangle, PlayCircle, CheckSquare, 
-  Search, RefreshCw, Paperclip, ExternalLink, Calendar, User, Building2, 
-  ShieldCheck, ArrowUpRight, Flame
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import {
+    ArrowUpRight,
+    Building2,
+    Calendar,
+    CheckCircle2,
+    CheckSquare,
+    Clock,
+    Flame,
+    Inbox,
+    Paperclip,
+    PlayCircle,
+    RefreshCw,
+    Search,
+    ShieldCheck,
+    User
 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
+import { toast } from "sonner";
+import EvidenceDownload from '../components/EvidenceDownload';
+import {
+    acceptGrievance,
+    getAssignedGrievances,
+    getGrievanceDetails,
+    getOfficerDashboardStats,
+    updateGrievanceStatus
+} from '../lib/api';
 
 const OfficerDashboardPage = () => {
   const { user } = useSelector((state) => state.auth);
+  const navigate = useNavigate();
 
   // Stats state
   const [stats, setStats] = useState({
@@ -40,11 +57,12 @@ const OfficerDashboardPage = () => {
   });
 
   // Table & Tab state
-  const [activeTab, setActiveTab] = useState("queue");
+  const [activeTab, setActiveTab] = useState("workload");
   const [deptQueue, setDeptQueue] = useState([]);
   const [myWorkload, setMyWorkload] = useState([]);
   const [resolvedHistory, setResolvedHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -53,17 +71,20 @@ const OfficerDashboardPage = () => {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [resolutionStatus, setResolutionStatus] = useState("RESOLVED");
   const [resolutionRemarks, setResolutionRemarks] = useState("");
+  const [resolutionVisibility, setResolutionVisibility] = useState('INTERNAL');
   const [submittingResolution, setSubmittingResolution] = useState(false);
 
   // Fetch Dashboard Stats & Lists
   const loadDashboardData = useCallback(async () => {
+    if (user?.role !== 'OFFICER') return;
     try {
       setLoading(true);
+      setLoadError('');
       const [statsRes, poolRes, workloadRes, resolvedRes] = await Promise.all([
-        getOfficerDashboardStats().catch(() => ({ data: null })),
-        getAssignedGrievances('DEPT_POOL').catch(() => ({ data: [] })),
-        getAssignedGrievances('MY_TASKS').catch(() => ({ data: [] })),
-        getAssignedGrievances('RESOLVED').catch(() => ({ data: [] }))
+        getOfficerDashboardStats(),
+        getAssignedGrievances('DEPT_POOL'),
+        getAssignedGrievances('MY_TASKS'),
+        getAssignedGrievances('RESOLVED')
       ]);
 
       if (statsRes?.data) {
@@ -80,6 +101,10 @@ const OfficerDashboardPage = () => {
       setMyWorkload(workloadRes.data || []);
       setResolvedHistory(resolvedRes.data || []);
     } catch (err) {
+      setDeptQueue([]);
+      setMyWorkload([]);
+      setResolvedHistory([]);
+      setLoadError(err.response?.status === 403 ? 'You do not have access to this officer queue.' : 'Officer data could not be loaded. Please retry.');
       toast.error("Failed to load officer data", { description: err.response?.data?.message || err.message });
     } finally {
       setLoading(false);
@@ -96,8 +121,7 @@ const OfficerDashboardPage = () => {
       setActionLoadingId(ticketId);
       await acceptGrievance(ticketId);
       toast.success("Grievance Accepted", { description: "Ticket is now under your Active Workload." });
-      await loadDashboardData();
-      setActiveTab("workload");
+      navigate(`/grievances/${ticketId}`);
     } catch (err) {
       toast.error("Failed to accept grievance", { description: err.response?.data?.message || err.message });
     } finally {
@@ -106,16 +130,30 @@ const OfficerDashboardPage = () => {
   };
 
   // Open Resolution Drawer
-  const openResolveDrawer = (ticket) => {
-    setSelectedTicket(ticket);
-    setResolutionStatus("RESOLVED");
-    setResolutionRemarks("");
-    setDrawerOpen(true);
+  const openResolveDrawer = async (ticket) => {
+    if (ticket.privateDetailsAvailable === false) return;
+    setSelectedTicket(null);
+    setDrawerOpen(false);
+    setActionLoadingId(ticket.id);
+    try {
+      const response = await getGrievanceDetails(ticket.id);
+      if (response.data.privateDetailsAvailable === false) return;
+      setSelectedTicket(response.data);
+      setResolutionStatus("RESOLVED");
+      setResolutionRemarks("");
+      setResolutionVisibility('INTERNAL');
+      setDrawerOpen(true);
+    } catch (err) {
+      toast.error(err.response?.status === 403 ? 'This private case is no longer assigned to you.' : 'The private case could not be opened.');
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   // Submit Resolution / Rejection
   const handleSubmitResolution = async (e) => {
     e.preventDefault();
+    if (!selectedTicket || selectedTicket.privateDetailsAvailable === false || submittingResolution) return;
     if (!resolutionRemarks.trim()) {
       toast.error("Validation Error", { description: "Resolution remarks are compulsory." });
       return;
@@ -125,8 +163,8 @@ const OfficerDashboardPage = () => {
       setSubmittingResolution(true);
       await updateGrievanceStatus(selectedTicket.id, {
         status: resolutionStatus,
-        resolutionRemarks: resolutionRemarks.trim(),
-        remarks: resolutionRemarks.trim()
+        remarks: resolutionRemarks.trim(),
+        visibility: resolutionVisibility
       });
       toast.success(`Ticket ${resolutionStatus === 'RESOLVED' ? 'Resolved' : 'Rejected'}`, {
         description: `Case ${selectedTicket.grievanceNumber} marked as ${resolutionStatus}.`
@@ -139,15 +177,6 @@ const OfficerDashboardPage = () => {
     } finally {
       setSubmittingResolution(false);
     }
-  };
-
-  // SLA Calculation helper
-  const isSlaBreached = (ticket) => {
-    if (!ticket?.createdAt) return false;
-    const created = new Date(ticket.createdAt).getTime();
-    const days = ticket.resolutionDays || (ticket.priority === 'HIGH' ? 1 : ticket.priority === 'MEDIUM' ? 3 : 7);
-    const limitMs = days * 24 * 60 * 60 * 1000;
-    return Date.now() - created > limitMs;
   };
 
   // Helpers for formatting
@@ -190,6 +219,9 @@ const OfficerDashboardPage = () => {
     if (!searchTerm.trim()) return list;
     const term = searchTerm.toLowerCase();
     return list.filter(item => 
+      String(item.id).includes(term) ||
+      item.departmentName?.toLowerCase().includes(term) ||
+      item.status?.toLowerCase().includes(term) ||
       item.grievanceNumber?.toLowerCase().includes(term) ||
       item.title?.toLowerCase().includes(term) ||
       item.citizenName?.toLowerCase().includes(term) ||
@@ -197,9 +229,11 @@ const OfficerDashboardPage = () => {
     );
   };
 
-  const filteredQueue = useMemo(() => filterList(deptQueue), [deptQueue, searchTerm]);
-  const filteredWorkload = useMemo(() => filterList(myWorkload), [myWorkload, searchTerm]);
-  const filteredHistory = useMemo(() => filterList(resolvedHistory), [resolvedHistory, searchTerm]);
+  const filteredQueue = filterList(deptQueue);
+  const filteredWorkload = filterList(myWorkload);
+  const filteredHistory = filterList(resolvedHistory);
+
+  if (user?.role !== 'OFFICER') return <p role="alert" className="p-8">This console is available to officers only.</p>;
 
   return (
     <div className="container max-w-7xl mx-auto px-4 py-8 space-y-8 animate-in fade-in-50 duration-300">
@@ -299,6 +333,7 @@ const OfficerDashboardPage = () => {
       </div>
 
       {/* Main Workspace Tabs */}
+      {loadError && <p role="alert" className="text-destructive">{loadError}</p>}
       <Card className="rounded-2xl border-border/40 bg-card/60 backdrop-blur-xl shadow-xl overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-border/40 flex flex-col sm:flex-row items-center justify-between gap-4">
           
@@ -320,7 +355,7 @@ const OfficerDashboardPage = () => {
           <div className="relative w-full sm:w-72">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input 
-              placeholder="Search tickets, citizen..." 
+              placeholder={activeTab === 'queue' ? 'Filter queue metadata...' : 'Filter loaded tickets...'}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 rounded-xl bg-background/50 border-border/60 text-xs"
@@ -335,11 +370,11 @@ const OfficerDashboardPage = () => {
               <TableHeader className="bg-muted/30">
                 <TableRow className="hover:bg-transparent border-border/40">
                   <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Ticket ID</TableHead>
-                  <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Citizen</TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Department</TableHead>
                   <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Issue Title</TableHead>
                   <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Priority</TableHead>
                   <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Submitted</TableHead>
-                  <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">SLA Status</TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Status</TableHead>
                   <TableHead className="text-right font-bold text-xs uppercase tracking-wider text-muted-foreground">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -356,36 +391,26 @@ const OfficerDashboardPage = () => {
                   </TableRow>
                 ) : (
                   filteredQueue.map((ticket) => {
-                    const breached = isSlaBreached(ticket);
                     return (
                       <TableRow key={ticket.id} className="border-border/30 hover:bg-muted/30 transition-colors">
                         <TableCell className="font-black text-xs font-mono tracking-tight text-primary">
-                          {ticket.grievanceNumber}
+                          {ticket.id}
                         </TableCell>
                         <TableCell className="font-semibold text-xs text-foreground">
                           <div className="flex items-center gap-1.5">
-                            <User className="w-3.5 h-3.5 text-muted-foreground" />
-                            {ticket.citizenName || "Anonymous"}
+                            <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+                            {ticket.departmentName}
                           </div>
                         </TableCell>
                         <TableCell className="max-w-xs">
-                          <div className="font-bold text-xs text-foreground truncate" title={ticket.title}>{ticket.title}</div>
-                          <div className="text-[11px] text-muted-foreground truncate">{ticket.description}</div>
+                          <div className="font-bold text-xs text-foreground">Private grievance</div>
                         </TableCell>
                         <TableCell>{getPriorityBadge(ticket.priority)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                           {formatDate(ticket.createdAt)}
                         </TableCell>
                         <TableCell>
-                          {breached ? (
-                            <Badge variant="destructive" className="text-[10px] font-bold uppercase tracking-wider animate-pulse">
-                              <AlertTriangle className="w-3 h-3 mr-1" /> Overdue
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-[10px] font-semibold text-muted-foreground border-border/60">
-                              Within SLA
-                            </Badge>
-                          )}
+                          {getStatusBadge(ticket.status)}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button 
@@ -458,6 +483,7 @@ const OfficerDashboardPage = () => {
                         <Button 
                           size="sm" 
                           onClick={() => openResolveDrawer(ticket)}
+                          disabled={ticket.privateDetailsAvailable === false || actionLoadingId !== null}
                           className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
                         >
                           <CheckSquare className="w-3.5 h-3.5 mr-1.5" /> Resolve / Reject
@@ -482,7 +508,7 @@ const OfficerDashboardPage = () => {
                   <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Issue Title</TableHead>
                   <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Outcome</TableHead>
                   <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Closed Date</TableHead>
-                  <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Resolution Remarks</TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Description</TableHead>
                   <TableHead className="text-right font-bold text-xs uppercase tracking-wider text-muted-foreground">View</TableHead>
                 </TableRow>
               </TableHeader>
@@ -519,10 +545,10 @@ const OfficerDashboardPage = () => {
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          onClick={() => {
-                            setSelectedTicket(ticket);
-                            setDrawerOpen(true);
-                          }}
+                          onClick={() => openResolveDrawer(ticket)}
+                          disabled={ticket.privateDetailsAvailable === false || actionLoadingId !== null}
+                          aria-label="Open private case"
+                          title="Open private case"
                           className="rounded-xl text-xs font-bold hover:bg-muted"
                         >
                           <ArrowUpRight className="w-4 h-4" />
@@ -538,7 +564,7 @@ const OfficerDashboardPage = () => {
       </Card>
 
       {/* Resolution Slide-over Drawer / Modal */}
-      <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+      <Sheet open={drawerOpen} onOpenChange={(open) => { setDrawerOpen(open); if (!open) setSelectedTicket(null); }}>
         <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto flex flex-col justify-between">
           <div>
             <SheetHeader className="mb-6">
@@ -585,28 +611,12 @@ const OfficerDashboardPage = () => {
                   <span className="font-bold uppercase tracking-wider text-[11px] text-primary flex items-center gap-1.5">
                     <Paperclip className="w-3.5 h-3.5" /> Attached Evidence
                   </span>
-                  {selectedTicket.attachmentUrl?.match(/\.(jpeg|jpg|png|gif|webp)$/i) ? (
-                    <div className="mt-2 rounded-lg overflow-hidden border border-border/40 max-h-48 bg-black/20">
-                      <img 
-                        src={selectedTicket.imageUrl || `/${selectedTicket.attachmentUrl}`} 
-                        alt="Evidence" 
-                        className="w-full h-auto object-cover hover:scale-105 transition-transform"
-                      />
-                    </div>
-                  ) : null}
-                  <a 
-                    href={selectedTicket.imageUrl || `/${selectedTicket.attachmentUrl}`} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline mt-1"
-                  >
-                    View / Download Full Attachment <ExternalLink className="w-3 h-3" />
-                  </a>
+                  <EvidenceDownload key={selectedTicket.id} caseId={selectedTicket.id} />
                 </div>
               )}
 
               {/* Status Update Form (Active Workload only) */}
-              {selectedTicket?.status !== 'RESOLVED' && selectedTicket?.status !== 'REJECTED' && (
+              {selectedTicket && selectedTicket.privateDetailsAvailable !== false && ['ASSIGNED', 'IN_PROGRESS', 'PENDING'].includes(selectedTicket.status) && (
                 <form id="resolution-form" onSubmit={handleSubmitResolution} className="space-y-4 pt-2">
                   <div className="space-y-1.5">
                     <Label className="font-bold text-xs">Official Redressal Action *</Label>
@@ -626,12 +636,23 @@ const OfficerDashboardPage = () => {
                   </div>
 
                   <div className="space-y-1.5">
+                    <Label htmlFor="resolution-visibility">Update visibility</Label>
+                    <Select value={resolutionVisibility} onValueChange={setResolutionVisibility}>
+                      <SelectTrigger id="resolution-visibility"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="INTERNAL">Internal: staff only</SelectItem>
+                        <SelectItem value="PARTICIPANTS">Owner-visible</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
                       <Label className="font-bold text-xs">Resolution Remarks *</Label>
                       <span className="text-[10px] text-muted-foreground">{resolutionRemarks.length}/1000</span>
                     </div>
                     <Textarea 
                       required
+                      maxLength={1000}
                       rows={4}
                       value={resolutionRemarks}
                       onChange={(e) => setResolutionRemarks(e.target.value)}
@@ -648,7 +669,7 @@ const OfficerDashboardPage = () => {
             <Button variant="outline" size="sm" onClick={() => setDrawerOpen(false)} className="rounded-xl font-bold">
               Close
             </Button>
-            {selectedTicket?.status !== 'RESOLVED' && selectedTicket?.status !== 'REJECTED' && (
+            {selectedTicket && selectedTicket.privateDetailsAvailable !== false && ['ASSIGNED', 'IN_PROGRESS', 'PENDING'].includes(selectedTicket.status) && (
               <Button 
                 type="submit" 
                 form="resolution-form"

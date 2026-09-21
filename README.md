@@ -141,7 +141,7 @@ On startup (only when the **`dev`** Spring profile is active), `DataInitializer.
 * **File upload validation** (`FileStorageService`): max **5 MB**; extension + content-type allowlist (**JPEG / PNG / PDF**); stored under unique UUID names in `uploads/`; violations raise `400 Bad Request`.
 * **DTO validation** wired on registration, login, grievance submission, status updates, profile, and feedback requests.
 * **Seed data gated to the `dev` profile** so demo accounts never leak into production; legacy `admin` account is removed/deactivated.
-* **Privacy masking** — students can only view full details of their own grievances; the public/recent feed strips sensitive fields for regular users.
+* **Private-by-default cases** — full details, evidence, history, and feedback require the owner, assigned same-department officer, or admin. Community shows only admin-reviewed published summaries; internal history remains hidden from owners. See [privacy contracts and deployment migration](Backend/PRIVACY_MIGRATION.md) before deploying.
 
 ---
 
@@ -183,9 +183,9 @@ Base URL: `http://localhost:8081` — interactive docs at [`/swagger-ui.html`](h
 | `POST` | `/api/grievances` | USER | Submit grievance (`multipart`: `data` + optional `file`) |
 | `GET` | `/api/grievances/my` | USER | List grievances submitted by the current user |
 | `GET` | `/api/grievances/recent` | Authenticated | Recent grievance feed |
-| `GET` | `/api/grievances/all` | Authenticated | Global feed (privacy-masked for regular users) |
+| `GET` | `/api/grievances/all` | Authenticated | Published, reviewed summaries only |
 | `GET` | `/api/grievances` | OFFICER, ADMIN | Full grievance list |
-| `GET` | `/api/grievances/{id}` | Authenticated | Full details with role-based privacy masking |
+| `GET` | `/api/grievances/{id}` | Owner / assigned same-department officer / admin | Authorized private details |
 | `GET` | `/api/grievances/{id}/history` | Authenticated | Audit-trail timeline |
 | `GET` | `/api/grievances/officers` | OFFICER, ADMIN | List officers for assignment |
 | `PUT` | `/api/grievances/{id}/accept` | OFFICER, ADMIN | Accept a department-pool ticket (➔ `IN_PROGRESS`) |

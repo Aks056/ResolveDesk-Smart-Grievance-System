@@ -1,6 +1,7 @@
 package com.grievance.dto.request;
 
 import com.grievance.enums.GrievanceStatus;
+
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -23,6 +24,8 @@ public class UpdateStatusRequest {
 
     @Size(max = 1000, message = "Remarks must not exceed 1000 characters")
     private String remarks;
+
+    private com.grievance.enums.HistoryVisibility visibility = com.grievance.enums.HistoryVisibility.INTERNAL;
 
     public String getEffectiveRemarks() {
         if (resolutionRemarks != null && !resolutionRemarks.trim().isEmpty()) {

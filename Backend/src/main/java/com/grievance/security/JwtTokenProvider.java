@@ -29,6 +29,9 @@ public class JwtTokenProvider {
     // Initialize signing key once
     @PostConstruct
     public void init() {
+        if (jwtSecret == null || jwtSecret.isBlank()) {
+            throw new IllegalStateException("JWT_SECRET_KEY environment variable must be set — refusing to start with no signing key");
+        }
         byte[] keyBytes;
         try {
             keyBytes = Decoders.BASE64.decode(jwtSecret);

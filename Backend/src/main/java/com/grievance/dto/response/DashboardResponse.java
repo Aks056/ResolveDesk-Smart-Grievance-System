@@ -47,6 +47,7 @@ public class DashboardResponse {
     
     // Time-based trends
     private Map<String, Long> dailyTrends;
+    private Map<String, Long> dailyResolvedTrends;
     private Map<String, Long> weeklyTrends;
     private Map<String, Long> monthlyTrends;
 
@@ -64,5 +65,6 @@ public class DashboardResponse {
         private long resolvedCount;
         private double averageRating;
         private double averageResolutionTime;
+        private long activeGrievanceCount;
     }
 }

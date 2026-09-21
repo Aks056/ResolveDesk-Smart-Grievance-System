@@ -1,12 +1,14 @@
 package com.grievance.dto.response;
 
+import java.time.LocalDateTime;
+
 import com.grievance.enums.GrievanceStatus;
 import com.grievance.enums.Priority;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.time.LocalDateTime;
 
 /**
  * DTO for grievance response.
@@ -21,6 +23,12 @@ public class GrievanceResponse {
     private String grievanceNumber;
     private String title;
     private String description;
+    private Boolean published;
+    private String publicId;
+    private String publicTitle;
+    private String publicSummary;
+    @Builder.Default
+    private boolean privateDetailsAvailable = true;
     private String attachmentUrl;
     private String imageUrl;
     private GrievanceStatus status;

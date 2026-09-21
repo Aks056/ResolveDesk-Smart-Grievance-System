@@ -1,17 +1,17 @@
 package com.grievance.service;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.UUID;
+
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.grievance.config.FileUploadProperties;
 import com.grievance.exception.BadRequestException;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.util.UUID;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,23 +50,72 @@ public class FileStorageService {
             throw new BadRequestException("File content type not allowed: " + contentType);
         }
 
-        // Create upload directory if it does not exist
-        String uploadDir = fileUploadProperties.getUpload().getDir();
-        Path uploadPath = Paths.get(uploadDir);
-        if (!Files.exists(uploadPath)) {
-            Files.createDirectories(uploadPath);
-        }
-
-        // Generate unique filename
-        String uniqueFilename = UUID.randomUUID().toString() + "_" + originalFilename;
+        Path uploadPath = storageRoot();
+        String uniqueFilename = UUID.randomUUID().toString() + "." + extension;
         Path filePath = uploadPath.resolve(uniqueFilename);
 
-        // Save file
-        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-        log.info("File saved: {}", filePath.toString());
+        try (var input = file.getInputStream()) {
+            Files.copy(input, filePath);
+        }
+        return uniqueFilename;
+    }
 
-        // Return relative path for storage in database
-        return uploadDir + uniqueFilename;
+    private Path storageRoot() throws IOException {
+        Path configured = Paths.get(fileUploadProperties.getUpload().getDir()).toAbsolutePath().normalize();
+        rejectStaticRoot(configured);
+        Files.createDirectories(configured);
+        Path root = configured.toRealPath();
+        rejectStaticRoot(root);
+        return root;
+    }
+
+    private void rejectStaticRoot(Path root) {
+        for (Path component : root) {
+            if (java.util.Set.of("static", "public", "resources", "meta-inf", "webapp")
+                    .contains(component.toString().toLowerCase(java.util.Locale.ROOT))) {
+                throw new IllegalStateException("Evidence storage must be outside static web roots");
+            }
+        }
+    }
+
+    public org.springframework.core.io.Resource loadEvidence(String storedPath) {
+        try {
+            if (storedPath == null || storedPath.isBlank() || storedPath.indexOf('\0') >= 0) return missingEvidence();
+            Path root = storageRoot();
+            String normalized = storedPath.replace('\\', '/');
+            Path stored = Paths.get(normalized);
+            for (Path component : stored) {
+                if (component.toString().equals("..")) return missingEvidence();
+            }
+            Path candidate;
+            if (stored.isAbsolute()) {
+                candidate = stored.normalize();
+            } else if (stored.getNameCount() == 1) {
+                candidate = root.resolve(stored);
+            } else {
+                String prefix = fileUploadProperties.getUpload().getDir().replace('\\', '/');
+                if (!prefix.endsWith("/")) prefix += "/";
+                if (normalized.startsWith(prefix)) {
+                    candidate = root.resolve(normalized.substring(prefix.length())).normalize();
+                } else {
+                    candidate = stored.toAbsolutePath().normalize();
+                }
+            }
+            if (!candidate.startsWith(root) || !root.equals(candidate.getParent())) return missingEvidence();
+            String filename = candidate.getFileName().toString();
+            if (!filename.matches("(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:_[^/\\\\:]+|\\.[a-z0-9]+)")) {
+                return missingEvidence();
+            }
+            Path real = candidate.toRealPath();
+            if (!real.startsWith(root) || !Files.isRegularFile(real)) return missingEvidence();
+            return new org.springframework.core.io.FileSystemResource(real);
+        } catch (IOException | InvalidPathException exception) {
+            return missingEvidence();
+        }
+    }
+
+    private org.springframework.core.io.Resource missingEvidence() {
+        throw new com.grievance.exception.ResourceNotFoundException("Evidence is unavailable");
     }
 
     private String getFileExtension(String filename) {
