@@ -1,6 +1,9 @@
 package com.grievance.exception;
 
-import lombok.extern.slf4j.Slf4j;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,8 +15,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
-import java.util.ArrayList;
-import java.util.List;
+
+import jakarta.persistence.OptimisticLockException;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Global Exception Handler for all REST endpoints
@@ -21,6 +25,15 @@ import java.util.List;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+
+        @ExceptionHandler({OptimisticLockingFailureException.class, OptimisticLockException.class})
+        public ResponseEntity<ApiError> handleOptimisticLockException(WebRequest request) {
+                ApiError apiError = new ApiError(
+                                HttpStatus.CONFLICT,
+                                "The record was changed by another request. Reload it and try again.",
+                                request.getDescription(false).replace("uri=", ""));
+                return new ResponseEntity<>(apiError, HttpStatus.CONFLICT);
+        }
 
     // ✅ Resource not found
     @ExceptionHandler(ResourceNotFoundException.class)

@@ -21,11 +21,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.grievance.dto.request.GrievanceRequest;
 import com.grievance.dto.request.UpdateStatusRequest;
-import com.grievance.enums.Priority;
 import com.grievance.dto.response.GrievanceResponse;
+import com.grievance.enums.Priority;
 import com.grievance.security.CustomUserDetails;
-import com.grievance.service.GrievanceService;
 import com.grievance.service.DepartmentService;
+import com.grievance.service.GrievanceService;
 
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
@@ -81,9 +81,7 @@ public class GrievanceController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> getGrievanceDetails(@PathVariable Long id, Authentication authentication) {
         Long requesterId = getUserId(authentication);
-        boolean isAdminOrOfficer = authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_OFFICER"));
-        return ResponseEntity.ok(grievanceService.getGrievanceDetails(id, requesterId, isAdminOrOfficer));
+        return ResponseEntity.ok(grievanceService.getGrievanceDetails(id, requesterId));
     }
 
     // ================= ASSIGNED / DEPARTMENT SCOPE =================
@@ -123,18 +121,16 @@ public class GrievanceController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             Authentication authentication) {
-        boolean isAdminOrOfficer = authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_OFFICER"));
+        if (page < 0 || size < 1) throw new com.grievance.exception.BadRequestException("Invalid pagination");
         org.springframework.data.domain.Pageable pageable = 
-            org.springframework.data.domain.PageRequest.of(page, size);
-        org.springframework.data.domain.Page<GrievanceResponse> grievances = 
-            grievanceService.getGlobalGrievances(!isAdminOrOfficer, pageable);
+            org.springframework.data.domain.PageRequest.of(page, Math.min(size, 100));
+        var grievances = grievanceService.getGlobalGrievances(getUserId(authentication), pageable);
         return ResponseEntity.ok(grievances);
     }
 
     // ================= ADMIN ALL =================
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getAllGrievances(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
@@ -196,8 +192,39 @@ public class GrievanceController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> toggleUpvote(@PathVariable Long id, Authentication authentication) {
         Long userId = getUserId(authentication);
-        GrievanceResponse response = grievanceService.toggleUpvote(id, userId);
+        var response = grievanceService.toggleUpvote(id, userId);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/public/{publicId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getPublicGrievance(@PathVariable String publicId, Authentication authentication) {
+        return ResponseEntity.ok(grievanceService.getPublicGrievance(publicId, getUserId(authentication)));
+    }
+
+    @PostMapping("/public/{publicId}/upvote")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> togglePublicUpvote(@PathVariable String publicId, Authentication authentication) {
+        return ResponseEntity.ok(grievanceService.togglePublicUpvote(publicId, getUserId(authentication)));
+    }
+
+    @PutMapping("/{id}/publication")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updatePublication(@PathVariable Long id,
+            @Valid @RequestBody com.grievance.dto.request.PublicationRequest request, Authentication authentication) {
+        return ResponseEntity.ok(grievanceService.updatePublication(id, getUserId(authentication), request));
+    }
+
+    @GetMapping("/{id}/attachments/evidence")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<org.springframework.core.io.Resource> downloadEvidence(@PathVariable Long id, Authentication authentication) {
+        var evidence = grievanceService.getEvidence(id, getUserId(authentication));
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header("Content-Disposition", org.springframework.http.ContentDisposition.attachment().filename("evidence").build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                .header("Cache-Control", "private, no-store")
+                .body(evidence);
     }
 
     // ================= COMMON METHOD =================

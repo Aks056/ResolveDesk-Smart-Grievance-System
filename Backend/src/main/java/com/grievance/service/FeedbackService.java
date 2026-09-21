@@ -29,6 +29,7 @@ public class FeedbackService {
     private FeedbackRepository feedbackRepository;
     private GrievanceRepository grievanceRepository;
     private UserRepository userRepository;
+    private GrievanceAccessPolicy accessPolicy;
 
     public FeedbackResponse submitFeedback(Long userId, FeedbackRequest request) {
         log.info("Submitting feedback for grievance: {} by user: {}", request.getGrievanceId(), userId);
@@ -39,7 +40,8 @@ public class FeedbackService {
         Grievance grievance = grievanceRepository.findById(request.getGrievanceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", request.getGrievanceId()));
 
-        if (!grievance.getCitizen().getId().equals(userId)) {
+        accessPolicy.requireRead(grievance, accessPolicy.requester(userId));
+        if (user.getRole() != com.grievance.enums.Role.USER || !grievance.getCitizen().getId().equals(userId)) {
             throw new BadRequestException("Only grievance citizen can provide feedback");
         }
 
@@ -64,6 +66,7 @@ public class FeedbackService {
         Grievance grievance = grievanceRepository.findById(grievanceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
 
+        accessPolicy.requireRead(grievance, accessPolicy.currentRequester());
         return feedbackRepository.findByGrievanceOrderByCreatedAtDesc(grievance).stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
@@ -75,6 +78,7 @@ public class FeedbackService {
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
         return feedbackRepository.findByUserOrderByCreatedAtDesc(user).stream()
+            .filter(feedback -> accessPolicy.canRead(feedback.getGrievance(), accessPolicy.requester(userId)))
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
@@ -84,6 +88,7 @@ public class FeedbackService {
         Grievance grievance = grievanceRepository.findById(grievanceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
 
+        accessPolicy.requireRead(grievance, accessPolicy.currentRequester());
         return feedbackRepository.getAverageRatingForGrievance(grievance);
     }
 
@@ -101,6 +106,7 @@ public class FeedbackService {
         Feedback feedback = feedbackRepository.findById(feedbackId)
                 .orElseThrow(() -> new ResourceNotFoundException("Feedback", "id", feedbackId));
 
+        accessPolicy.requireRead(feedback.getGrievance(), accessPolicy.requester(userId));
         if (!feedback.getUser().getId().equals(userId)) {
             throw new BadRequestException("Only feedback creator can delete feedback");
         }

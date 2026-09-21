@@ -77,22 +77,24 @@ const NewGrievancePage = () => {
 
     try {
       const data = new FormData();
-      data.append('title', formData.title);
-      
+
       let finalDescription = formData.description;
       if (evidenceType === 'link' && formData.imageUrl) {
         finalDescription += `\n\nReference Image URL: ${formData.imageUrl}`;
       }
-      data.append('description', finalDescription);
-      data.append('departmentId', formData.departmentId);
-      data.append('priority', formData.priority);
+
+      const grievancePayload = {
+        title: formData.title,
+        description: finalDescription,
+        departmentId: Number(formData.departmentId),
+        priority: formData.priority,
+      };
+      data.append('data', new Blob([JSON.stringify(grievancePayload)], { type: 'application/json' }));
       if (evidenceType === 'upload' && file) {
         data.append('file', file);
       }
 
-      await api.post('/grievances', data, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      await api.post('/grievances', data);
 
       setSuccess(true);
       setTimeout(() => navigate('/dashboard'), 2000);

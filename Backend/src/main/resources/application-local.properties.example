@@ -2,5 +2,5 @@
 # Copy this file to application-local.properties (which is gitignored)
 # and fill in your actual values.
 
-spring.datasource.password=your_local_mysql_password_here
-spring.datasource.username=root
+DB_PASSWORD=
+JWT_SECRET_KEY=replace_with_a_random_64plus_char_string_generated_by_openssl

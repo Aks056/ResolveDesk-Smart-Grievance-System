@@ -1,19 +1,19 @@
-import React from 'react';
-import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import DashboardPage from './pages/DashboardPage';
-import OfficerDashboardPage from './pages/OfficerDashboardPage';
-import NewGrievancePage from './pages/NewGrievancePage';
-import ProfilePage from './pages/ProfilePage';
-import MyGrievancesPage from './pages/MyGrievancesPage';
-import RecentGrievancesPage from './pages/RecentGrievancesPage';
-import GrievanceDetailsPage from './pages/GrievanceDetailsPage';
-import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
-import ProtectedRoute from './components/ProtectedRoute';
+import { createBrowserRouter, Navigate, Outlet, RouterProvider } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
+import ProtectedRoute from './components/ProtectedRoute';
 import ScrollToTop from './components/ScrollToTop';
+import AdminGrievancesPage from './pages/AdminGrievancesPage';
+import DashboardPage from './pages/DashboardPage';
+import GrievanceDetailsPage from './pages/GrievanceDetailsPage';
+import LoginPage from './pages/LoginPage';
+import MyGrievancesPage from './pages/MyGrievancesPage';
+import NewGrievancePage from './pages/NewGrievancePage';
+import OfficerDashboardPage from './pages/OfficerDashboardPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import ProfilePage from './pages/ProfilePage';
+import RecentGrievancesPage from './pages/RecentGrievancesPage';
+import RegisterPage from './pages/RegisterPage';
 
 // Helper component for ScrollToTop in RouterProvider
 const ScrollWrapper = () => (
@@ -38,7 +38,7 @@ const DashboardRoute = () => {
 };
 
 const App = () => {
-  const { isAuthenticated } = useSelector((state) => state.auth);
+  const { isAuthenticated, user } = useSelector((state) => state.auth);
 
   const router = createBrowserRouter([
     {
@@ -59,9 +59,10 @@ const App = () => {
           ),
           children: [
             { path: "/dashboard", element: <DashboardRoute /> },
-            { path: "/officer", element: <OfficerDashboardPage /> },
-            { path: "/officer-dashboard", element: <OfficerDashboardPage /> },
-            { path: "/admin", element: <RecentGrievancesPage /> },
+            { path: "/officer", element: user?.role === 'OFFICER' ? <OfficerDashboardPage /> : <Navigate to="/dashboard" replace /> },
+            { path: "/officer-dashboard", element: user?.role === 'OFFICER' ? <OfficerDashboardPage /> : <Navigate to="/dashboard" replace /> },
+            { path: "/admin", element: user?.role === 'ADMIN' ? <DashboardPage /> : <Navigate to="/dashboard" replace /> },
+            { path: "/admin/grievances", element: <ProtectedRoute allowedRoles={['ADMIN']}><AdminGrievancesPage /></ProtectedRoute> },
             { path: "/grievances", element: <MyGrievancesPage /> },
             { path: "/recent-grievances", element: <RecentGrievancesPage /> },
             { path: "/grievances/new", element: <NewGrievancePage /> },

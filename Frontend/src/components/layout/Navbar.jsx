@@ -1,29 +1,30 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
-import { logout } from '../../store/authSlice';
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { 
-  LayoutDashboard, 
-  PlusCircle, 
-  ShieldAlert, 
-  LogOut, 
-  Sun, 
-  Moon, 
-  User, 
-  Bell, 
-  Menu, 
-  X 
+import {
+    Bell,
+    Globe,
+    LayoutDashboard,
+    LogOut,
+    Menu,
+    Moon,
+    PlusCircle,
+    ShieldAlert,
+    Sun,
+    User,
+    X
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { toast } from "sonner";
+import { logout } from '../../store/authSlice';
 
 const Navbar = () => {
   const { user } = useSelector((state) => state.auth);
@@ -51,9 +52,10 @@ const Navbar = () => {
 
   const navLinks = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['USER', 'OFFICER', 'ADMIN'] },
+    { name: 'Community', path: '/recent-grievances', icon: Globe, roles: ['USER', 'OFFICER', 'ADMIN'] },
     { name: 'My Grievances', path: '/grievances', icon: ShieldAlert, roles: ['USER'] },
     { name: 'New Grievance', path: '/grievances/new', icon: PlusCircle, roles: ['USER'] },
-    { name: 'Admin Panel', path: '/admin', icon: ShieldAlert, roles: ['ADMIN'] },
+    { name: 'All Cases', path: '/admin/grievances', icon: ShieldAlert, roles: ['ADMIN'] },
   ];
 
   const filteredLinks = navLinks.filter(link => 
@@ -80,7 +82,7 @@ const Navbar = () => {
           </Link>
 
           {/* Desktop Nav Links */}
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden xl:flex items-center gap-1">
             {filteredLinks.map((link) => (
               <Link 
                 key={link.path} 
@@ -168,7 +170,7 @@ const Navbar = () => {
            <Button 
             variant="ghost" 
             size="icon" 
-            className="md:hidden" 
+            className="xl:hidden"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           >
             {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -178,7 +180,7 @@ const Navbar = () => {
 
       {/* Mobile Nav Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden border-t border-border/40 bg-card/95 backdrop-blur-2xl animate-in slide-in-from-top-4 duration-300">
+        <div className="xl:hidden border-t border-border/40 bg-card/95 backdrop-blur-2xl animate-in slide-in-from-top-4 duration-300">
           <div className="container space-y-2 py-4 px-4">
             {filteredLinks.map((link) => (
               <Link 

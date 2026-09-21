@@ -1,21 +1,33 @@
-import { useEffect, useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import api from '../lib/api';
-import {   
-  Card, CardContent, CardDescription, CardHeader, CardTitle 
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+    Card, CardContent,
+    CardHeader, CardTitle
+} from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { 
-  ArrowLeft, Building2, Clock, CheckCircle2, AlertCircle, Calendar, 
-  User, MessageSquare, Image as ImageIcon, History, XCircle, MoreVertical,
-  ExternalLink, Download, ShieldCheck, Star
-} from "lucide-react";
-import ConfirmDialog from '../components/ConfirmDialog';
 import { cn } from "@/lib/utils";
+import {
+    AlertCircle,
+    ArrowLeft, Building2,
+    Calendar,
+    CheckCircle2,
+    Clock,
+    History,
+    Image as ImageIcon,
+    MessageSquare,
+    ShieldCheck, Star,
+    User,
+    XCircle
+} from "lucide-react";
+import { useCallback, useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from "sonner";
+import ConfirmDialog from '../components/ConfirmDialog';
+import EvidenceDownload from '../components/EvidenceDownload';
+import PublicationControls from '../components/PublicationControls';
+import api from '../lib/api';
+import { getOfficerName } from '../lib/privacy';
 
 const GrievanceDetailsPage = () => {
   const { id } = useParams();
@@ -24,6 +36,7 @@ const GrievanceDetailsPage = () => {
   const [grievance, setGrievance] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [closing, setClosing] = useState(false);
   const [modal, setModal] = useState({ 
     isOpen: false, 
@@ -45,34 +58,36 @@ const GrievanceDetailsPage = () => {
   const [feedbackComments, setFeedbackComments] = useState("");
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
-  useEffect(() => {
-    if (grievance) {
-      setLocalPriority(grievance.priority);
-      setLocalOfficerId(grievance.assignedOfficerId || "");
-    }
-  }, [grievance]);
-
-  const fetchDetails = async () => {
+  const fetchDetails = useCallback(async (signal) => {
     try {
       setLoading(true);
+      setLoadError('');
+      setGrievance(null);
+      setHistory([]);
+      setFeedback(null);
+      setOfficers([]);
       window.scrollTo(0, 0); // Reset scroll position to top
-      const [detailsRes, historyRes] = await Promise.all([
-        api.get(`/grievances/${id}`),
-        api.get(`/grievances/${id}/history`)
-      ]);
+      const detailsRes = await api.get(`/grievances/${id}`, { signal });
+      if (signal?.aborted) return;
+      const historyRes = await api.get(`/grievances/${id}/history`, { signal });
+      if (signal?.aborted) return;
       setGrievance(detailsRes.data);
+      setLocalPriority(detailsRes.data.priority);
+      setLocalOfficerId(String(detailsRes.data.assignedOfficerId || ''));
       setHistory(historyRes.data || []);
 
       if (detailsRes.data.status === 'RESOLVED' || detailsRes.data.status === 'CLOSED_BY_USER') {
         try {
           setLoadingFeedback(true);
-          const feedbackRes = await api.get(`/feedback/grievance/${id}`);
+          const feedbackRes = await api.get(`/feedback/grievance/${id}`, { signal });
+          if (signal?.aborted) return;
           if (feedbackRes.data && feedbackRes.data.length > 0) {
             setFeedback(feedbackRes.data[0]);
           } else {
             setFeedback(null);
           }
         } catch (err) {
+          if (signal?.aborted) return;
           console.error("Failed to fetch feedback", err);
           setFeedback(null);
         } finally {
@@ -84,22 +99,33 @@ const GrievanceDetailsPage = () => {
 
       if (user?.role === 'ADMIN' || user?.role === 'OFFICER') {
         try {
-          const officersRes = await api.get('/grievances/officers');
+          const officersRes = await api.get('/grievances/officers', { signal });
+          if (signal?.aborted) return;
           setOfficers(officersRes.data || []);
         } catch (err) {
           console.error("Failed to fetch officers", err);
         }
       }
     } catch (err) {
-      console.error("Failed to fetch grievance details", err);
+      if (signal?.aborted) return;
+      setGrievance(null);
+      setHistory([]);
+      setFeedback(null);
+      setLoadError(err.response?.status === 403
+        ? 'This case is private. Only its owner, assigned department officer, and administrators can open it.'
+        : err.response?.status === 404
+          ? 'This grievance could not be found.'
+          : 'The private case could not be loaded. Please try again.');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
-  };
+  }, [id, user?.role]);
 
   useEffect(() => {
-    fetchDetails();
-  }, [id, user]);
+    const controller = new AbortController();
+    fetchDetails(controller.signal);
+    return () => controller.abort();
+  }, [fetchDetails]);
 
   const handleClose = () => {
     setModal({
@@ -197,7 +223,7 @@ const GrievanceDetailsPage = () => {
       }
 
       // 2. Update assignee if changed
-      const currentOfficerId = grievance.assignedOfficerId || "";
+      const currentOfficerId = String(grievance.assignedOfficerId || "");
       if (localOfficerId !== currentOfficerId) {
         const url = user.role === 'ADMIN' 
           ? `/admin/grievances/${id}/assign/${localOfficerId}`
@@ -210,27 +236,19 @@ const GrievanceDetailsPage = () => {
 
       // 3. Add remarks if entered
       if (remarks.trim()) {
-        const prefix = isInternal ? "[INTERNAL]" : "[PUBLIC]";
-        const formattedRemarks = `${prefix} ${remarks.trim()}`;
         promises.push(api.put(`/grievances/${id}/status`, {
           status: grievance.status,
-          remarks: formattedRemarks
+          remarks: remarks.trim(),
+          visibility: isInternal ? 'INTERNAL' : 'PARTICIPANTS'
         }));
         updated = true;
-        setRemarks("");
       }
 
       if (updated) {
         await Promise.all(promises);
+        setRemarks("");
         toast.success("Changes saved successfully");
-        
-        // Reload details
-        const [detailsRes, historyRes] = await Promise.all([
-          api.get(`/grievances/${id}`),
-          api.get(`/grievances/${id}/history`)
-        ]);
-        setGrievance(detailsRes.data);
-        setHistory(historyRes.data || []);
+        await fetchDetails();
       } else {
         toast.info("No modifications detected");
       }
@@ -246,38 +264,26 @@ const GrievanceDetailsPage = () => {
     try {
       setLoading(true);
       
-      let formattedRemarks = statusRemarks;
-      if (statusRemarks && !statusRemarks.startsWith('[PUBLIC]') && !statusRemarks.startsWith('[INTERNAL]')) {
-        formattedRemarks = `[PUBLIC] ${statusRemarks}`;
-      }
-
       if (newStatus === 'IN_PROGRESS' && user.role === 'OFFICER' && grievance.status === 'PENDING') {
         await api.put(`/grievances/${id}/accept`);
       } else {
         await api.put(`/grievances/${id}/status`, {
           status: newStatus,
-          remarks: formattedRemarks || `[PUBLIC] Status transitioned to ${newStatus}`
+          remarks: statusRemarks.trim() || `Status transitioned to ${newStatus}`,
+          visibility: isInternal ? 'INTERNAL' : 'PARTICIPANTS'
         });
       }
       setRemarks("");
-      const [detailsRes, historyRes] = await Promise.all([
-        api.get(`/grievances/${id}`),
-        api.get(`/grievances/${id}/history`)
-      ]);
-      setGrievance(detailsRes.data);
-      setHistory(historyRes.data || []);
+      await fetchDetails();
     } catch (err) {
       console.error("Failed to update status", err);
+      toast.error(err.response?.status === 403 ? 'You no longer have permission to update this case.' : 'Status could not be updated.');
     } finally {
       setLoading(false);
     }
   };
 
-  const displayHistory = useMemo(() => {
-    const isAdminOrOfficer = user?.role === 'ADMIN' || user?.role === 'OFFICER';
-    if (isAdminOrOfficer) return history;
-    return history.filter(item => !item.remarks?.startsWith('[INTERNAL]'));
-  }, [history, user]);
+  const displayHistory = history;
 
   const formatRemark = (remark) => {
     if (!remark) return "";
@@ -314,9 +320,9 @@ const GrievanceDetailsPage = () => {
     return (
       <div className="container max-w-4xl mx-auto p-10 text-center space-y-6">
         <XCircle className="w-16 h-16 text-destructive mx-auto opacity-20" />
-        <h2 className="text-2xl font-bold tracking-tight">Record Not Found</h2>
-        <p className="text-muted-foreground">The requested grievance record could not be retrieved from the server.</p>
-        <Button onClick={() => navigate('/dashboard')} variant="outline" className="px-8 rounded-full">Return to Safety</Button>
+        <h2 className="text-2xl font-bold tracking-tight">Private Case Unavailable</h2>
+        <p role="alert" className="text-muted-foreground">{loadError || 'The requested grievance record could not be retrieved.'}</p>
+        <Button onClick={() => navigate('/dashboard')} variant="outline" className="px-8 rounded-full">Return to dashboard</Button>
       </div>
     );
   }
@@ -403,45 +409,8 @@ const GrievanceDetailsPage = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {grievance.imageUrl ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-3 rounded-2xl bg-background border border-border/40">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-indigo-500/10 flex items-center justify-center">
-                          <ImageIcon className="h-5 w-5 text-indigo-600" />
-                        </div>
-                        <div className="space-y-0.5">
-                          <p className="text-sm font-bold truncate max-w-[200px]">Evidence_Artifact.png</p>
-                          <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Image file</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" asChild>
-                          <a href={grievance.imageUrl} target="_blank" rel="noopener noreferrer" title="View Original">
-                            <ExternalLink className="h-4 w-4 text-primary" />
-                          </a>
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" asChild>
-                          <a href={grievance.imageUrl} download="Evidence_Artifact.png" title="Download">
-                            <Download className="h-4 w-4 text-primary" />
-                          </a>
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    <div className="relative group rounded-3xl overflow-hidden border border-border/40 bg-muted/20">
-                      <img 
-                        src={grievance.imageUrl} 
-                        alt="Evidence" 
-                        className="w-full object-cover max-h-[300px] transition-transform duration-700 group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-                        <a href={grievance.imageUrl} target="_blank" rel="noopener noreferrer" className="p-3 bg-white/10 backdrop-blur-md rounded-full text-white font-bold text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-white/25 transition-all">
-                          <ExternalLink className="h-4 w-4" /> Open Fullscreen
-                        </a>
-                      </div>
-                    </div>
-                  </div>
+                {grievance.attachmentUrl || grievance.imageUrl ? (
+                  <EvidenceDownload key={id} caseId={id} />
                 ) : (
                   <div className="py-6 text-center text-sm font-medium text-muted-foreground italic">
                     No attachments or evidence files uploaded.
@@ -449,6 +418,14 @@ const GrievanceDetailsPage = () => {
                 )}
               </CardContent>
             </Card>
+
+            {user?.role === 'ADMIN' && (
+              <PublicationControls
+                key={`${id}-${grievance.published}-${grievance.publicTitle}-${grievance.publicSummary}`}
+                grievance={grievance}
+                onUpdated={fetchDetails}
+              />
+            )}
 
             {/* Feedback & Ratings Section */}
             {(grievance.status === 'RESOLVED' || grievance.status === 'CLOSED_BY_USER') && (
@@ -581,11 +558,13 @@ const GrievanceDetailsPage = () => {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-black uppercase tracking-widest text-[#4F46E5]">{item.status}</span>
-                          {item.remarks?.startsWith('[INTERNAL]') && (
+                          {(item.visibility === 'INTERNAL' || (!item.visibility && item.remarks?.startsWith('[INTERNAL]'))) && (
                             <Badge className="bg-amber-500/10 text-amber-600 border-none font-bold uppercase text-[8px] px-1.5 py-0.5">
                               Internal Note
                             </Badge>
                           )}
+                          {item.visibility === 'PARTICIPANTS' && <Badge variant="outline">Owner-visible</Badge>}
+                          {item.visibility === 'PUBLIC' && <Badge variant="outline">Public</Badge>}
                         </div>
                         <span className="text-[10px] font-bold text-muted-foreground">{new Date(item.updatedAt).toLocaleString()}</span>
                       </div>
@@ -718,7 +697,7 @@ const GrievanceDetailsPage = () => {
                     >
                       <option value="">-- Unassigned --</option>
                       {officers.map(off => (
-                        <option key={off.id} value={off.id}>{off.fullName} ({off.departmentName || 'No Department'})</option>
+                        <option key={off.id} value={off.id}>{getOfficerName(off)} ({off.departmentName || 'No Department'})</option>
                       ))}
                     </select>
                   </div>
@@ -728,11 +707,12 @@ const GrievanceDetailsPage = () => {
                   {/* Status updates with remarks */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between pb-1">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Remarks Type</label>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Update visibility</label>
                       <div className="flex items-center gap-1 bg-background border border-border/40 p-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider">
                         <button
                           type="button"
                           onClick={() => setIsInternal(true)}
+                          aria-pressed={isInternal}
                           className={cn(
                             "px-2 py-0.5 rounded transition-all cursor-pointer",
                             isInternal 
@@ -745,6 +725,7 @@ const GrievanceDetailsPage = () => {
                         <button
                           type="button"
                           onClick={() => setIsInternal(false)}
+                          aria-pressed={!isInternal}
                           className={cn(
                             "px-2 py-0.5 rounded transition-all cursor-pointer",
                             !isInternal 
@@ -752,7 +733,7 @@ const GrievanceDetailsPage = () => {
                               : "text-muted-foreground hover:text-foreground"
                           )}
                         >
-                          Public
+                          Owner-visible
                         </button>
                       </div>
                     </div>
