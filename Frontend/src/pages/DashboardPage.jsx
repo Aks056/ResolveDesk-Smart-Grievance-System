@@ -59,7 +59,7 @@ import {
     XAxis, YAxis
 } from 'recharts';
 import { toast } from "sonner";
-import api from '../lib/api';
+import api, { reopenGrievance } from '../lib/api';
 import { getOfficerName } from '../lib/privacy';
 
 
@@ -82,6 +82,10 @@ const DashboardPage = () => {
   const [officers, setOfficers] = useState([]);
   const [activeQuickViewGrievance, setActiveQuickViewGrievance] = useState(null);
   const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
+  const [reopenReason, setReopenReason] = useState("");
+  const [reopenError, setReopenError] = useState("");
+  const [reopening, setReopening] = useState(false);
+  const TERMINAL_STATUSES = ['REJECTED', 'RESOLVED', 'CLOSED_BY_USER'];
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(Date.now());
   const [searchTerm, setSearchTerm] = useState("");
@@ -302,13 +306,16 @@ const DashboardPage = () => {
       }
     } catch (err) {
       console.error("Failed to assign officer", err);
-      toast.error("Failed to assign officer");
+      toast.error(err.response?.data?.message || "Failed to assign officer");
     } finally {
       setLoading(false);
     }
   };
 
   const handleAssignOfficerFromDrawer = async () => {
+    if (!activeQuickViewGrievance || TERMINAL_STATUSES.includes(activeQuickViewGrievance.status)) {
+      return;
+    }
     if (!activeQuickViewGrievance || !selectedAssigneeId) {
       toast.error("Please select an officer to assign");
       return;
@@ -329,9 +336,38 @@ const DashboardPage = () => {
       setRefreshKey(Date.now());
     } catch (err) {
       console.error("Failed to assign officer from drawer", err);
-      toast.error("Failed to assign officer");
+      toast.error(err.response?.data?.message || "Failed to assign officer");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleReopenFromDrawer = async () => {
+    if (!activeQuickViewGrievance) return;
+    const trimmed = reopenReason.trim();
+    if (trimmed.length < 10 || trimmed.length > 1000) {
+      setReopenError("Reason must be between 10 and 1000 characters");
+      return;
+    }
+    setReopenError("");
+    try {
+      setReopening(true);
+      const res = await reopenGrievance(activeQuickViewGrievance.id, trimmed);
+      toast.success("Grievance reopened successfully");
+      setActiveQuickViewGrievance(prev => ({
+        ...prev,
+        status: 'PENDING',
+        assignedOfficerId: null,
+        assignedOfficerName: null
+      }));
+      setReopenReason("");
+      setRefreshKey(Date.now());
+      return res;
+    } catch (err) {
+      console.error("Failed to reopen grievance", err);
+      toast.error(err.response?.data?.message || "Failed to reopen grievance");
+    } finally {
+      setReopening(false);
     }
   };
 
@@ -371,7 +407,7 @@ const DashboardPage = () => {
     if (isAdmin && stats.dailyTrends) {
       const created = stats.dailyTrends || {};
       const resolved = stats.dailyResolvedTrends || {};
-      return Object.keys(created).map(day => {
+      return Object.keys(created).sort().map(day => {
         const d = new Date(day + 'T00:00:00');
         return {
           day: dayNames[d.getDay()],
@@ -683,6 +719,7 @@ const DashboardPage = () => {
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--muted)/0.3)" />
                   <XAxis 
                     type="number"
+                    allowDecimals={false}
                     axisLine={false}
                     tickLine={false}
                     tick={{ fontSize: 10, fontWeight: 600, fill: 'hsl(var(--muted-foreground))' }}
@@ -736,6 +773,7 @@ const DashboardPage = () => {
                     tick={{ fontSize: 10, fontWeight: 600, fill: 'hsl(var(--muted-foreground))' }}
                   />
                   <YAxis 
+                    allowDecimals={false}
                     axisLine={false}
                     tickLine={false}
                     tick={{ fontSize: 10, fontWeight: 600, fill: 'hsl(var(--muted-foreground))' }}
@@ -916,6 +954,7 @@ const DashboardPage = () => {
                                     Full Details
                                   </DropdownMenuItem>
                                   
+                                  {!TERMINAL_STATUSES.includes(g.status) && (
                                   <DropdownMenuSub>
                                     <DropdownMenuSubTrigger className="cursor-pointer font-bold text-xs uppercase tracking-wider">
                                       Assign Officer
@@ -936,6 +975,7 @@ const DashboardPage = () => {
                                       )}
                                     </DropdownMenuSubContent>
                                   </DropdownMenuSub>
+                                  )}
 
                                   <DropdownMenuSeparator />
                                   
@@ -1033,8 +1073,36 @@ const DashboardPage = () => {
             </div>
           </div>
 
-          {/* Assignment Dropdown and Submit */}
-          {isAdmin && activeQuickViewGrievance && (
+          {/* Terminal-status actions: Reopen (REJECTED) or read-only note; Assign only for open cases */}
+          {isAdmin && activeQuickViewGrievance && TERMINAL_STATUSES.includes(activeQuickViewGrievance.status) ? (
+            activeQuickViewGrievance.status === 'REJECTED' ? (
+              <div className="space-y-4 pt-4 border-t border-border/40 bg-card">
+                <div className="space-y-2">
+                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground/70">Reopen this grievance</label>
+                  <textarea
+                    value={reopenReason}
+                    onChange={(e) => setReopenReason(e.target.value)}
+                    placeholder="Explain why this rejection is being overturned (10-1000 characters)..."
+                    className="w-full p-2.5 rounded-xl bg-background border border-border text-sm font-semibold placeholder:font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 h-24 resize-none"
+                  />
+                  {reopenError && <p className="text-xs font-bold text-red-600">{reopenError}</p>}
+                </div>
+                <Button
+                  onClick={handleReopenFromDrawer}
+                  disabled={reopening}
+                  className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-bold uppercase tracking-widest text-xs rounded-xl shadow-lg shadow-indigo-600/20 transition-all cursor-pointer"
+                >
+                  {reopening ? 'Reopening...' : 'Reopen'}
+                </Button>
+              </div>
+            ) : (
+              <div className="pt-4 border-t border-border/40 bg-card">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Closed cases cannot be reassigned or reopened.
+                </p>
+              </div>
+            )
+          ) : (
             <div className="space-y-4 pt-4 border-t border-border/40 bg-card">
               <div className="space-y-2">
                 <label className="text-xs font-black uppercase tracking-widest text-muted-foreground/70">Assign To Officer</label>

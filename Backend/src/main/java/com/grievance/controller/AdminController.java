@@ -23,9 +23,12 @@ import org.springframework.web.bind.annotation.RestController;
 import com.grievance.entity.Department;
 import com.grievance.repository.GrievanceRepository;
 import com.grievance.security.CustomUserDetails;
+import com.grievance.dto.request.ReopenGrievanceRequest;
 import com.grievance.dto.response.GrievanceResponse;
 import com.grievance.service.DepartmentService;
 import com.grievance.service.GrievanceService;
+
+import jakarta.validation.Valid;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -98,6 +101,17 @@ public class AdminController {
         log.info("Assigning grievance {} to officer {}", grievanceId, officerId);
         Long adminId = getUserId(authentication);
         var response = grievanceService.assignGrievanceToOfficer(grievanceId, officerId, adminId);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/grievances/{grievanceId}/reopen")
+    public ResponseEntity<?> reopenGrievance(
+            @PathVariable Long grievanceId,
+            @Valid @RequestBody ReopenGrievanceRequest request,
+            Authentication authentication) {
+        log.info("Reopening grievance {} by admin", grievanceId);
+        Long adminId = getUserId(authentication);
+        var response = grievanceService.reopenGrievance(grievanceId, adminId, request.getRemarks());
         return ResponseEntity.ok(response);
     }
 

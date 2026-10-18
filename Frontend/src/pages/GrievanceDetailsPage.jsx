@@ -26,7 +26,7 @@ import { toast } from "sonner";
 import ConfirmDialog from '../components/ConfirmDialog';
 import EvidenceDownload from '../components/EvidenceDownload';
 import PublicationControls from '../components/PublicationControls';
-import api from '../lib/api';
+import api, { reopenGrievance } from '../lib/api';
 import { getOfficerName } from '../lib/privacy';
 
 const GrievanceDetailsPage = () => {
@@ -50,6 +50,10 @@ const GrievanceDetailsPage = () => {
   const [localPriority, setLocalPriority] = useState("");
   const [localOfficerId, setLocalOfficerId] = useState("");
   const [isInternal, setIsInternal] = useState(true);
+  const [reopenReason, setReopenReason] = useState("");
+  const [reopenError, setReopenError] = useState("");
+  const [reopening, setReopening] = useState(false);
+  const TERMINAL_STATUSES = ['REJECTED', 'RESOLVED', 'CLOSED_BY_USER'];
 
   // Feedback states
   const [feedback, setFeedback] = useState(null);
@@ -210,6 +214,28 @@ const GrievanceDetailsPage = () => {
     setLocalOfficerId(officerId);
   };
 
+  const handleReopenGrievance = async () => {
+    if (!grievance) return;
+    const trimmed = reopenReason.trim();
+    if (trimmed.length < 10 || trimmed.length > 1000) {
+      setReopenError("Reason must be between 10 and 1000 characters");
+      return;
+    }
+    setReopenError("");
+    try {
+      setReopening(true);
+      await reopenGrievance(grievance.id, trimmed);
+      toast.success("Grievance reopened successfully");
+      setReopenReason("");
+      await fetchDetails();
+    } catch (err) {
+      console.error("Failed to reopen grievance", err);
+      toast.error(err.response?.data?.message || "Failed to reopen grievance");
+    } finally {
+      setReopening(false);
+    }
+  };
+
   const handleUpdateTicket = async () => {
     try {
       setLoading(true);
@@ -222,14 +248,11 @@ const GrievanceDetailsPage = () => {
         updated = true;
       }
 
-      // 2. Update assignee if changed
+      // 2. Update assignee if changed (ADMIN only; officers must not assign)
       const currentOfficerId = String(grievance.assignedOfficerId || "");
-      if (localOfficerId !== currentOfficerId) {
-        const url = user.role === 'ADMIN' 
-          ? `/admin/grievances/${id}/assign/${localOfficerId}`
-          : `/officer/grievances/${id}/assign/${localOfficerId}`;
+      if (user.role === 'ADMIN' && localOfficerId !== currentOfficerId) {
         if (localOfficerId) {
-          promises.push(api.post(url));
+          promises.push(api.post(`/admin/grievances/${id}/assign/${localOfficerId}`));
           updated = true;
         }
       }
@@ -254,7 +277,7 @@ const GrievanceDetailsPage = () => {
       }
     } catch (err) {
       console.error("Failed to update ticket", err);
-      toast.error("Failed to save changes");
+      toast.error(err.response?.data?.message || "Failed to save changes");
     } finally {
       setLoading(false);
     }
@@ -679,7 +702,8 @@ const GrievanceDetailsPage = () => {
                     <select 
                       value={localPriority} 
                       onChange={(e) => handlePriorityChange(e.target.value)}
-                      className="w-full p-2.5 rounded-xl bg-background border border-border text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      disabled={TERMINAL_STATUSES.includes(grievance.status)}
+                      className="w-full p-2.5 rounded-xl bg-background border border-border text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option value="LOW">LOW</option>
                       <option value="MEDIUM">MEDIUM</option>
@@ -687,20 +711,47 @@ const GrievanceDetailsPage = () => {
                     </select>
                   </div>
 
-                  {/* Reassign Officer */}
+                  {/* Reassign Officer (ADMIN only; officers must not assign) */}
+                  {user?.role === 'ADMIN' && (
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Assign Officer</label>
                     <select 
                       value={localOfficerId} 
                       onChange={(e) => handleAssignOfficer(e.target.value)}
-                      className="w-full p-2.5 rounded-xl bg-background border border-border text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      disabled={TERMINAL_STATUSES.includes(grievance.status)}
+                      className="w-full p-2.5 rounded-xl bg-background border border-border text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option value="">-- Unassigned --</option>
                       {officers.map(off => (
                         <option key={off.id} value={off.id}>{getOfficerName(off)} ({off.departmentName || 'No Department'})</option>
                       ))}
                     </select>
+                    {TERMINAL_STATUSES.includes(grievance.status) && (
+                      <p className="text-[10px] font-medium text-muted-foreground">Closed cases cannot be reassigned or reopened.</p>
+                    )}
                   </div>
+                  )}
+
+                  {/* Reopen this grievance (ADMIN only) */}
+                  {user?.role === 'ADMIN' && grievance.status === 'REJECTED' && (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Reopen this grievance</label>
+                      <textarea 
+                        value={reopenReason}
+                        onChange={(e) => setReopenReason(e.target.value)}
+                        placeholder="Explain why this rejection is being overturned (10-1000 characters)..."
+                        className="w-full p-2.5 rounded-xl bg-background border border-border text-sm font-semibold placeholder:font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 h-24 resize-none"
+                      />
+                      {reopenError && <p className="text-xs font-bold text-red-600">{reopenError}</p>}
+                      <Button
+                        onClick={handleReopenGrievance}
+                        disabled={reopening}
+                        className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-lg shadow-indigo-600/20 transition-all cursor-pointer"
+                      >
+                        {reopening ? 'Reopening...' : 'Reopen'}
+                      </Button>
+                    </div>
+                  )}
 
                   <Separator className="bg-indigo-600/10" />
 

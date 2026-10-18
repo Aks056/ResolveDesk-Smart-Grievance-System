@@ -241,12 +241,41 @@ Legacy /uploads URLs are denied; attachmentUrl and imageUrl now reference this e
 | PUT | /api/admin/departments/{id} | Update department |
 | DELETE | /api/admin/departments/{id} | Delete department |
 | POST | /api/admin/grievances/{gId}/assign/{oId} | Assign grievance |
+| POST | /api/admin/grievances/{gId}/reopen | Reopen rejected grievance |
 | GET | /api/admin/statistics | {totalGrievances, totalDepartments, totalUsers} |
 | GET | /api/admin/grievances?page=0&size=10 | **PAGINATED** |
 | GET | /api/admin/users?page=0&size=10 | **PAGINATED** (UserResponse) |
 | GET | /api/admin/users/{id} | User details |
 | PUT | /api/admin/users/{id}/toggle-active?isActive=true | Toggle active |
 | DELETE | /api/admin/users/{id} | Delete user |
+
+---
+
+### POST /api/admin/grievances/{grievanceId}/reopen - Reopen Rejected Grievance
+
+**Auth:** ROLE_ADMIN (inherited from controller-level restriction)
+Reopens a REJECTED grievance: status returns to PENDING, the assigned officer is cleared
+(back to the department pool), and a PARTICIPANTS-visible history entry records the reason.
+The transition table above is unchanged; this endpoint is the only REJECTED -> PENDING path.
+
+**Request Body (JSON):**
+
+{"remarks":"Officer rejection did not include an on-site inspection"}
+
+| Field | Type | Required | Validation |
+|-------|------|----------|------------|
+| remarks | String | Yes | 10-1000 chars, not blank |
+
+**Response:** 200 OK - GrievanceResponse (status PENDING, assignedOfficerId null)
+
+**Errors:**
+
+| Status | When |
+|--------|------|
+| 400 | Grievance is not REJECTED (message includes current status) |
+| 400 | Validation failed (remarks blank, missing, or outside 10-1000 chars) — fieldErrors[] present |
+| 403 | Caller is not ADMIN |
+| 404 | Grievance ID does not exist |
 
 ---
 

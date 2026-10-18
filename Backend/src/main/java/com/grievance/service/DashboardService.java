@@ -3,6 +3,7 @@ package com.grievance.service;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -208,7 +209,7 @@ public class DashboardService {
     }
 
     private Map<String, Long> calculateDailyTrends() {
-        Map<String, Long> trends = new HashMap<>();
+        Map<String, Long> trends = new LinkedHashMap<>();
         LocalDateTime today = LocalDateTime.now().truncatedTo(ChronoUnit.DAYS);
 
         for (int i = 6; i >= 0; i--) {
@@ -224,7 +225,7 @@ public class DashboardService {
     }
 
     private Map<String, Long> calculateDailyResolvedTrends() {
-        Map<String, Long> trends = new HashMap<>();
+        Map<String, Long> trends = new LinkedHashMap<>();
         LocalDateTime today = LocalDateTime.now().truncatedTo(ChronoUnit.DAYS);
 
         for (int i = 6; i >= 0; i--) {
@@ -240,13 +241,13 @@ public class DashboardService {
     }
 
     private Map<String, Long> calculateWeeklyTrends() {
-        Map<String, Long> trends = new HashMap<>();
+        Map<String, Long> trends = new LinkedHashMap<>();
         LocalDateTime today = LocalDateTime.now().truncatedTo(ChronoUnit.DAYS);
-        LocalDateTime weekStart = today.minusWeeks(1);
+        LocalDateTime windowEnd = today.plusDays(1); // exclusive end, so today is included
 
         for (int i = 0; i < 4; i++) {
-            LocalDateTime start = weekStart.plusWeeks(i);
-            LocalDateTime end = start.plusWeeks(1);
+            LocalDateTime start = windowEnd.minusWeeks(4 - i);
+            LocalDateTime end = windowEnd.minusWeeks(3 - i);
 
             List<Grievance> weekGrievances = grievanceRepository.findByDateRange(start, end);
             String weekKey = "Week " + (i + 1);
@@ -257,7 +258,7 @@ public class DashboardService {
     }
 
     private Map<String, Long> calculateMonthlyTrends() {
-        Map<String, Long> trends = new HashMap<>();
+        Map<String, Long> trends = new LinkedHashMap<>();
         LocalDateTime today = LocalDateTime.now().truncatedTo(ChronoUnit.DAYS);
 
         for (int i = 11; i >= 0; i--) {

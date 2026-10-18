@@ -55,6 +55,7 @@ export const changePassword = (data) => api.put('/user/change-password', data);
 export const getOfficerDashboardStats = () => api.get('/dashboard/officer');
 export const getAssignedGrievances = (scope) => api.get('/grievances/assigned', { params: scope ? { scope } : {} });
 export const acceptGrievance = (id) => api.put(`/grievances/${id}/accept`);
+export const reopenGrievance = (id, remarks) => api.post(`/admin/grievances/${id}/reopen`, { remarks });
 export const updateGrievanceStatus = (id, data) => api.put(`/grievances/${id}/status`, data);
 export const getGrievanceDetails = (id) => api.get(`/grievances/${id}`);
 export const getGrievanceHistory = (id) => api.get(`/grievances/${id}/history`);

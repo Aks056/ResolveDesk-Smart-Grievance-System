@@ -65,7 +65,7 @@ public class GrievanceService {
     private static final Map<GrievanceStatus, Set<GrievanceStatus>> ALLOWED_TRANSITIONS = new HashMap<>();
     static {
         ALLOWED_TRANSITIONS.put(GrievanceStatus.PENDING, Set.of(GrievanceStatus.ASSIGNED, GrievanceStatus.IN_PROGRESS, GrievanceStatus.REJECTED));
-        ALLOWED_TRANSITIONS.put(GrievanceStatus.ASSIGNED, Set.of(GrievanceStatus.IN_PROGRESS, GrievanceStatus.REJECTED));
+        ALLOWED_TRANSITIONS.put(GrievanceStatus.ASSIGNED, Set.of(GrievanceStatus.IN_PROGRESS, GrievanceStatus.RESOLVED, GrievanceStatus.REJECTED));
         ALLOWED_TRANSITIONS.put(GrievanceStatus.IN_PROGRESS, Set.of(GrievanceStatus.RESOLVED, GrievanceStatus.REJECTED));
         ALLOWED_TRANSITIONS.put(GrievanceStatus.RESOLVED, Set.of());
         ALLOWED_TRANSITIONS.put(GrievanceStatus.REJECTED, Set.of());
@@ -315,6 +315,43 @@ public class GrievanceService {
 
         historyRepository.save(history);
         emailService.sendAssignmentEmail(officer.getEmail(), grievance.getGrievanceNumber());
+
+        return convertToResponse(updatedGrievance);
+    }
+
+    public GrievanceResponse reopenGrievance(Long grievanceId, Long adminId, String remarks) {
+        log.info("Reopening rejected grievance {} by admin {}", grievanceId, adminId);
+        User admin = accessPolicy.requester(adminId);
+        accessPolicy.requireAdmin(admin);
+
+        Grievance grievance = grievanceRepository.findById(grievanceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Grievance", "id", grievanceId));
+
+        // Reopen is the only sanctioned REJECTED -> PENDING path; ALLOWED_TRANSITIONS stays untouched.
+        if (grievance.getStatus() != GrievanceStatus.REJECTED) {
+            throw new BadRequestException("Only rejected grievances can be reopened (current status: " + grievance.getStatus() + ")");
+        }
+
+        // Capture real old status BEFORE mutating, so history reflects the actual prior state
+        GrievanceStatus oldStatus = grievance.getStatus();
+        grievance.setStatus(GrievanceStatus.PENDING);
+        grievance.setAssignedOfficer(null); // back to the department pool (unassigned tickets)
+        Grievance updatedGrievance = grievanceRepository.save(grievance);
+
+        GrievanceHistory history = GrievanceHistory.builder()
+                .grievance(updatedGrievance)
+                .oldStatus(oldStatus)
+                .newStatus(GrievanceStatus.PENDING)
+                .remarks("Reopened by administrator: " + remarks.trim())
+                .visibility(HistoryVisibility.PARTICIPANTS)
+                .updatedByUser(admin)
+                .build();
+
+        historyRepository.save(history);
+        log.info("Grievance reopened: {} -> {}", grievanceId, GrievanceStatus.PENDING);
+
+        emailService.sendStatusUpdateEmail(updatedGrievance.getCitizen().getEmail(),
+                updatedGrievance.getGrievanceNumber(), GrievanceStatus.PENDING.toString());
 
         return convertToResponse(updatedGrievance);
     }
