@@ -23,12 +23,15 @@ build/
 .m2/
 dependency-reduced-pom.xml
 
+# Maven
+target/
+
 # Gradle
 .gradle/
 gradle/
 
 # Spring Boot
-application.properties
+
 application-dev.properties
 application-prod.properties
 
@@ -62,3 +65,5 @@ Thumbs.db
 node_modules/
 package-lock.json
 npm-debug.log
+
+application.properties
