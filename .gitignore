@@ -28,7 +28,7 @@ dependency-reduced-pom.xml
 gradle/
 
 # Spring Boot
-application-local.properties
+application.properties
 application-dev.properties
 application-prod.properties
 

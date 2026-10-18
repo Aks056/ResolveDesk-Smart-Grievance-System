@@ -1,6 +1,0 @@
-# Local development database credentials
-# Copy this file to application-local.properties (which is gitignored)
-# and fill in your actual values.
-
-DB_PASSWORD=your_local_mysql_password_here
-JWT_SECRET_KEY=generate_a_long_random_string_here_at_least_32_chars
