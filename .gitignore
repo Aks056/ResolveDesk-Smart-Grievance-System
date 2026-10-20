@@ -2,6 +2,7 @@
 .idea/
 .vscode/
 .freebuff/
+.agent/
 /[Pp][Rr][Oo][Jj][Ee][Cc][Tt]_[Rr][Ee][Vv][Ii][Ee][Ww].[Mm][Dd]
 *.iml
 *.iws
